@@ -2,8 +2,9 @@
 
 Реализована основа Storm Control Panel `/panel/`. Устройство ESP8266 и Windows-агент
 не должны использовать пользовательские cookie. Программные credentials устройств
-описаны в [device-enrollment.md](device-enrollment.md); credentials агентов ещё
-предстоит реализовать. Telegram и публичная регистрация здесь не реализованы.
+описаны в [device-enrollment.md](device-enrollment.md), отдельные ключи будущих
+Windows-агентов — в [agent-identities.md](agent-identities.md).
+Telegram и публичная регистрация здесь не реализованы.
 
 ## Первоначальная настройка
 

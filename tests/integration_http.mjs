@@ -55,6 +55,18 @@ await client.request(`/api/v1/devices/${deviceCredential.device_id}/credentials/
   method: 'POST', headers: { 'X-CSRF-Token': session.csrf_token },
 });
 await assert.rejects(client.request(statePath, { headers: deviceAuth }), error => error.status === 401);
+const agentCredential = await client.request('/api/v1/agents/codex', {
+  method: 'POST', body: { name: 'HTTP agent identity test' }, headers: { 'X-CSRF-Token': session.csrf_token },
+});
+const agentAuth = { Authorization: `Bearer ${agentCredential.token}` };
+assert.deepEqual(await client.request('/api/v1/agents/codex/identity', { headers: agentAuth }),
+  { agent_id: agentCredential.agent_id, kind: 'codex_windows' });
+await assert.rejects(client.request('/api/v1/agents/codex/identity', { headers: deviceAuth }), error => error.status === 401);
+await assert.rejects(client.request(statePath, { headers: agentAuth }), error => error.status === 401);
+await client.request(`/api/v1/agents/codex/${agentCredential.agent_id}/credentials/revoke`, {
+  method: 'POST', headers: { 'X-CSRF-Token': session.csrf_token },
+});
+await assert.rejects(client.request('/api/v1/agents/codex/identity', { headers: agentAuth }), error => error.status === 401);
 for (const path of ['/panel/', '/simulator/?device=integration-tv', '/simulator/preview.mjs']) {
   assert.equal((await fetcher(path)).status, 200);
 }

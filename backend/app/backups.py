@@ -140,6 +140,7 @@ def _snapshot(source: Path, destination: Path, migrations: Path, timeout: float,
                 connection.execute('DELETE FROM auth_sessions')
                 revoked_at = int(time.time())
                 connection.execute('UPDATE device_credentials SET revoked_at = ? WHERE revoked_at IS NULL', (revoked_at,))
+                connection.execute('UPDATE agent_credentials SET revoked_at = ? WHERE revoked_at IS NULL', (revoked_at,))
                 connection.execute('UPDATE device_enrollment_codes SET consumed_at = ? WHERE consumed_at IS NULL', (revoked_at,))
         with closing(_readonly(stage, deadline)) as verified:
             version = _verify(verified, migrations)
