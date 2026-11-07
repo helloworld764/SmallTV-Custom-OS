@@ -155,7 +155,10 @@ API чтения устройств и изменения настроек тр�
 Для будущего Windows Codex Monitor добавлены отдельные регистрации и ключи
 агентов: [docs/agent-identities.md](docs/agent-identities.md). Добавлены серверный
 приём heartbeat и состояние связи UNKNOWN/ONLINE/STALE/OFFLINE по серверному времени.
-Сам Monitor и события Codex ещё не реализованы. Пользовательские cookie, device-
+Сервер принимает упорядоченные события START/WORKING/DONE/ERROR/INTERRUPTED с run_id
+и защитой от повторов: [docs/codex-events.md](docs/codex-events.md). Это собственный
+протокол; сам Monitor и источник реальных событий Codex ещё не реализованы.
+Пользовательские cookie, device-
 и agent-ключи не заменяют друг друга.
 
 Повторный запуск сохраняет записи и не повторяет применённые миграции.

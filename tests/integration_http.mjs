@@ -1,5 +1,6 @@
 // Called by pytest with an isolated Windows/local test server and runtime-only input.
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { ApiClient, ApiError } from '../web/panel/api.mjs';
 import { PreviewSettings } from '../web/simulator/preview.mjs';
@@ -61,6 +62,21 @@ const agentCredential = await client.request('/api/v1/agents/codex', {
 const agentAuth = { Authorization: `Bearer ${agentCredential.token}` };
 const presencePath = `/api/v1/agents/codex/${agentCredential.agent_id}/presence`;
 assert.equal((await client.request(presencePath)).state, 'UNKNOWN');
+const softwareStart = { event_id: randomUUID(), run_id: randomUUID(), sequence: 1,
+  kind: 'START', occurred_at: Math.floor(Date.now() / 1000) };
+const report = body => client.request('/api/v1/agents/codex/events', {
+  method: 'POST', body, headers: agentAuth,
+});
+assert.equal((await report(softwareStart)).duplicate, false);
+assert.equal((await report(softwareStart)).duplicate, true);
+assert.equal((await client.request(presencePath)).state, 'UNKNOWN');
+const runPath = `/api/v1/agents/codex/${agentCredential.agent_id}/runs/${softwareStart.run_id}`;
+assert.equal((await client.request(runPath)).last_reported_state, 'WORKING');
+await assert.rejects(report({ ...softwareStart, kind: 'DONE' }), error => error.status === 409);
+const softwareDone = { ...softwareStart, event_id: randomUUID(), sequence: 2, kind: 'DONE' };
+await report(softwareDone);
+assert.equal((await client.request(runPath)).last_reported_state, 'DONE');
+assert.equal((await client.request(`${runPath}/events?after_sequence=1`)).length, 1);
 await client.request('/api/v1/agents/codex/heartbeat', { method: 'POST', body: {}, headers: agentAuth });
 const presence = await client.request(presencePath);
 assert.equal(presence.state, 'ONLINE');
@@ -77,6 +93,8 @@ await client.request(`/api/v1/agents/codex/${agentCredential.agent_id}/credentia
 });
 await assert.rejects(client.request('/api/v1/agents/codex/identity', { headers: agentAuth }), error => error.status === 401);
 assert.equal((await client.request(presencePath)).state, 'OFFLINE');
+await assert.rejects(report(softwareDone), error => error.status === 401);
+assert.equal((await client.request(runPath)).last_reported_state, 'DONE');
 await assert.rejects(client.request('/api/v1/agents/codex/heartbeat', {
   method: 'POST', body: {}, headers: agentAuth,
 }), error => error.status === 401);
@@ -88,4 +106,4 @@ try { await client.settings('integration-tv'); assert.fail('Session should be re
 catch (error) { assert.equal(error.status, 401); preview.fail(error.status); }
 assert.equal(preview.state, 'signed-out');
 assert.equal(preview.settings.theme, 'BlackArch Red');
-console.log('HTTP integration passed: authentication, SQLite, simulator preview, device enrollment, agent heartbeat/revocation and logout.');
+console.log('HTTP integration passed: authentication, SQLite, simulator preview, device enrollment, agent heartbeat/events/revocation and logout.');

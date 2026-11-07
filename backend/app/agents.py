@@ -103,6 +103,17 @@ def authenticated_agent(request: Request,
     return row['id']
 
 
+def require_agent_key(connection, agent_id: str, credentials: HTTPAuthorizationCredentials):
+    """Revalidate inside a write transaction to serialize with key revocation."""
+    valid = connection.execute('''SELECT 1 FROM agent_credentials
+        JOIN codex_agents ON codex_agents.id = agent_credentials.agent_id
+        JOIN local_accounts ON local_accounts.user_id = codex_agents.owner_id
+        WHERE agent_id = ? AND token_hash = ? AND revoked_at IS NULL AND is_active = 1''',
+        (agent_id, token_hash(credentials.credentials))).fetchone()
+    if valid is None:
+        raise HTTPException(401, 'Agent authentication required', headers={'WWW-Authenticate': 'Bearer'})
+
+
 @router.get('/identity', response_model=AgentIdentity)
 def identity(agent_id: Annotated[str, Depends(authenticated_agent)]):
     return AgentIdentity(agent_id=agent_id)
@@ -115,13 +126,7 @@ def heartbeat(payload: HeartbeatRequest, request: Request,
     with request.app.state.database.transaction() as connection:
         # Recheck under the write lock: revoke/rotate/disable may have raced
         # with the dependency lookup. Never refresh a superseded credential.
-        valid = connection.execute('''SELECT 1 FROM agent_credentials
-            JOIN codex_agents ON codex_agents.id = agent_credentials.agent_id
-            JOIN local_accounts ON local_accounts.user_id = codex_agents.owner_id
-            WHERE agent_id = ? AND token_hash = ? AND revoked_at IS NULL AND is_active = 1''',
-            (agent_id, token_hash(credentials.credentials))).fetchone()
-        if valid is None:
-            raise HTTPException(401, 'Agent authentication required', headers={'WWW-Authenticate': 'Bearer'})
+        require_agent_key(connection, agent_id, credentials)
         received_at = now()
         previous = connection.execute('SELECT last_seen_at FROM agent_presence WHERE agent_id = ?', (agent_id,)).fetchone()
         if previous is not None and 0 <= received_at - previous['last_seen_at'] < 5:
