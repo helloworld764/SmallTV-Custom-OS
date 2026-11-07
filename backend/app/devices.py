@@ -1,4 +1,4 @@
-"""Owner-scoped device reads and settings updates; no enrollment yet."""
+"""Owner-scoped device reads and settings updates; enrollment is a separate router."""
 
 from typing import Annotated, Literal
 

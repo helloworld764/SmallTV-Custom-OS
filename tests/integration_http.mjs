@@ -42,6 +42,19 @@ preview.apply(await client.settings('integration-tv'), Date.now());
 assert.equal(preview.state, 'fresh');
 await assert.rejects(client.settings('foreign-tv'), error => error.status === 404);
 await checkHealth(fetcher, new AbortController().signal);
+const pairing = await client.request('/api/v1/devices/enrollment-codes', {
+  method: 'POST', body: { name: 'HTTP software client' }, headers: { 'X-CSRF-Token': session.csrf_token },
+});
+const deviceCredential = await client.request('/api/v1/devices/enroll', { method: 'POST', body: { code: pairing.code } });
+const statePath = `/api/v1/devices/${deviceCredential.device_id}/state`;
+const deviceAuth = { Authorization: `Bearer ${deviceCredential.token}` };
+const deviceState = await client.request(statePath, { headers: deviceAuth });
+assert.equal(deviceState.device_id, deviceCredential.device_id);
+assert.equal(deviceState.settings.start_screen, 'clock');
+await client.request(`/api/v1/devices/${deviceCredential.device_id}/credentials/revoke`, {
+  method: 'POST', headers: { 'X-CSRF-Token': session.csrf_token },
+});
+await assert.rejects(client.request(statePath, { headers: deviceAuth }), error => error.status === 401);
 for (const path of ['/panel/', '/simulator/?device=integration-tv', '/simulator/preview.mjs']) {
   assert.equal((await fetcher(path)).status, 200);
 }
@@ -50,4 +63,4 @@ try { await client.settings('integration-tv'); assert.fail('Session should be re
 catch (error) { assert.equal(error.status, 401); preview.fail(error.status); }
 assert.equal(preview.state, 'signed-out');
 assert.equal(preview.settings.theme, 'BlackArch Red');
-console.log('HTTP integration passed: JS panel API -> authentication -> SQLite -> simulator preview -> logout.');
+console.log('HTTP integration passed: authentication, SQLite, simulator preview, device enrollment/revocation and logout.');

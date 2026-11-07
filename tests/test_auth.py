@@ -350,5 +350,5 @@ def test_migration_from_previous_registry_preserves_users_and_devices(tmp_path):
     upgraded.initialize()
     with upgraded.connection() as connection:
         assert connection.execute('SELECT owner_id FROM devices').fetchone()[0] == 'legacy'
-        assert connection.execute('SELECT COUNT(*) FROM schema_migrations').fetchone()[0] == 2
+        assert connection.execute('SELECT COUNT(*) FROM schema_migrations').fetchone()[0] == len(list(MIGRATIONS.glob('*.sql')))
         assert connection.execute('SELECT COUNT(*) FROM local_accounts').fetchone()[0] == 0

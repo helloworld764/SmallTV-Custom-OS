@@ -16,6 +16,7 @@ from .config import Settings
 from .database import Database
 from .auth import router as auth_router
 from .devices import router as devices_router
+from .enrollment import router as enrollment_router
 
 
 class Health(BaseModel):
@@ -64,6 +65,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         })
 
     app.include_router(auth_router)
+    app.include_router(enrollment_router)
     app.include_router(devices_router)
 
     @app.get("/health", response_model=Health)
