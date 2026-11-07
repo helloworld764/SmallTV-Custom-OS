@@ -78,3 +78,27 @@ def test_dotenv_and_environment_precedence(tmp_path, monkeypatch):
 
 def test_static_mount_does_not_expose_backend_sources(client):
     assert client.get('/simulator/%2e%2e/%2e%2e/backend/app/config.py').status_code == 404
+
+
+def test_panel_is_public_shell_with_no_private_data(client):
+    response = client.get('/panel/')
+    assert response.status_code == 200
+    assert 'text/html' in response.headers['content-type']
+    assert 'id="login-form"' in response.text
+    assert 'id="settings-form"' in response.text
+    assert 'id="empty"' in response.text
+    assert 'type="password"' in response.text
+    for asset in ('style.css', 'panel.mjs', 'api.mjs', 'help.html'):
+        assert client.get(f'/panel/{asset}').status_code == 200
+    assert client.get('/api/v1/devices').status_code == 401
+    assert client.get('/panel/%2e%2e/%2e%2e/backend/app/config.py').status_code == 404
+    assert client.get('/panel/.env').status_code == 404
+
+
+def test_panel_modules_override_windows_plaintext_mime(client, monkeypatch):
+    mimetypes.init()
+    monkeypatch.setitem(mimetypes.types_map, '.mjs', 'text/plain')
+    for asset in ('panel.mjs', 'api.mjs'):
+        response = client.get(f'/panel/{asset}')
+        assert response.headers['content-type'] == 'text/javascript; charset=utf-8'
+        assert response.headers['x-content-type-options'] == 'nosniff'

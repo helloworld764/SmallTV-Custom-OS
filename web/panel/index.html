@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SmallTV — панель управления</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/panel/" aria-label="SmallTV — главная"><span class="brand-mark" aria-hidden="true">S</span> SmallTV <span class="brand-caption">CUSTOM OS</span></a>
+    <a class="simulator-link" href="/simulator/" target="_blank" rel="noopener">Открыть симулятор <span aria-hidden="true">↗</span></a>
+  </header>
+  <main>
+    <div id="message" class="message" role="alert" hidden></div>
+    <section id="boot" class="boot" aria-live="polite">
+      <p>Проверяем сессию…</p>
+      <button id="retry" class="secondary" type="button" hidden>Повторить подключение</button>
+    </section>
+    <section id="login-view" class="login-layout" hidden>
+      <div class="intro">
+        <p class="eyebrow">ВАШЕ ПРОСТРАНСТВО</p>
+        <h1>Маленький экран.<br><span>Ваши настройки.</span></h1>
+        <p class="lead">Управляйте своими SmallTV из одной панели.</p>
+        <div class="display-motif" aria-hidden="true"><div><span class="motif-dot"></span><strong>240<span>×</span>240</strong><small>SMALLTV CUSTOM OS</small></div></div>
+        <p class="intro-note">Оформление · Яркость · Стартовый экран</p>
+      </div>
+      <section class="card login-card" aria-labelledby="login-title">
+        <p class="eyebrow">ПАНЕЛЬ УПРАВЛЕНИЯ</p>
+        <h2 id="login-title">Вход в аккаунт</h2>
+        <p class="muted">Используйте свой логин и пароль.</p>
+        <form id="login-form">
+          <fieldset id="login-fields">
+            <label for="username">Логин</label>
+            <input id="username" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" minlength="3" maxlength="64" required>
+            <label for="password">Пароль</label>
+            <input id="password" name="password" type="password" autocomplete="current-password" maxlength="1024" required>
+            <button type="submit" class="primary">Войти</button>
+          </fieldset>
+        </form>
+        <p class="setup-note">Первый вход? Создайте администратора по <a href="/panel/help.html">инструкции</a>.</p>
+      </section>
+    </section>
+    <section id="dashboard" hidden aria-labelledby="devices-title">
+      <div class="dashboard-heading">
+        <div><p class="eyebrow">ПАНЕЛЬ УПРАВЛЕНИЯ</p><h1 id="devices-title">Мои устройства</h1></div>
+        <div class="account"><div><strong id="account-name"></strong><span id="account-role"></span></div><button id="logout" class="secondary" type="button">Выйти</button></div>
+      </div>
+      <div class="section-heading"><p class="muted" id="device-count"></p><button id="refresh" class="text-button" type="button">Обновить список</button></div>
+      <section id="empty" class="card empty-state" hidden>
+        <div class="empty-icon" aria-hidden="true">□</div><h2>Устройств пока нет</h2>
+        <p>Здесь появятся устройства, привязанные к вашему аккаунту.</p>
+        <p class="muted">SmallTV ещё в пути? Можно познакомиться с локальным симулятором.</p>
+        <a class="button secondary" href="/simulator/" target="_blank" rel="noopener">Открыть симулятор ↗</a>
+      </section>
+      <div id="device-workspace" class="workspace" hidden>
+        <aside class="card device-sidebar" aria-label="Выбор устройства"><div id="device-list"></div><button id="load-more" class="secondary" type="button" hidden>Показать ещё</button></aside>
+        <section class="card settings-card" aria-labelledby="settings-title">
+          <p class="eyebrow">НАСТРОЙКИ УСТРОЙСТВА</p><h2 id="settings-title">Выберите устройство</h2>
+          <p id="settings-loading" class="muted" hidden>Загружаем настройки…</p>
+          <form id="settings-form" hidden>
+            <fieldset id="settings-fields">
+              <div class="field-row"><div><label for="brightness">Яркость</label><p class="hint">От 0 до 100%</p></div><div class="number-field"><input id="brightness" name="brightness" type="number" min="0" max="100" step="1" required><span>%</span></div></div>
+              <input id="brightness-range" class="range" type="range" min="0" max="100" step="1" aria-label="Ползунок яркости">
+              <div class="form-divider"></div>
+              <label for="theme">Тема оформления</label>
+              <select id="theme" name="theme"><option>BlackArch Red</option><option>Dark Blue</option><option>Purple</option><option>Light</option></select>
+              <label for="start-screen">Стартовый экран</label>
+              <select id="start-screen" name="start_screen"><option value="clock">Часы</option><option value="weather">Погода</option><option value="monitor">Мониторинг</option><option value="codex">Codex</option><option value="null">Null</option><option value="tamagotchi">Tamagotchi</option></select>
+              <p class="hint">Настройки сохраняются на сервере. Доставка на реальный SmallTV пока не подключена.</p>
+              <div class="save-row"><button class="primary" type="submit">Сохранить настройки</button><button id="reload-settings" class="text-button" type="button">Перечитать с сервера</button></div>
+            </fieldset>
+          </form>
+          <p id="save-result" class="save-result" role="status"></p>
+        </section>
+      </div>
+    </section>
+    <noscript><p class="message">Для работы панели необходимо разрешить JavaScript в браузере.</p></noscript>
+  </main>
+  <footer class="page-footer"><span>SmallTV Custom OS</span><span id="connection">Доступность сервера ещё не проверена</span></footer>
+  <script type="module" src="panel.mjs"></script>
+</body>
+</html>

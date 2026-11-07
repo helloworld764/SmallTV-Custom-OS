@@ -1,0 +1,10 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>SmallTV — первый вход</title><link rel="stylesheet" href="style.css"></head>
+<body><header class="topbar"><a class="brand" href="/panel/">← SmallTV</a></header><main class="help card"><p class="eyebrow">ПЕРВЫЙ ВХОД</p><h1>Создайте администратора</h1>
+<p>В PowerShell из папки проекта остановите backend через Ctrl+C и выполните:</p>
+<pre><code>.\.venv\Scripts\python.exe -m backend.app.manage create-admin --username owner</code></pre>
+<p>Введите свой пароль дважды. Ввод скрыт; минимум 12 символов. Не отправляйте пароль в чат и не сохраняйте его в файлах проекта.</p>
+<p>Затем запустите backend:</p><pre><code>.\.venv\Scripts\python.exe -m backend.app</code></pre>
+<p>Для локальной разработки на Debian используйте <code>.venv/bin/python</code> вместо пути Windows.</p>
+<p>Если администратор уже существует, используйте его логин. Команда повторного создания не меняет существующий пароль. Публичная регистрация пока недоступна.</p>
+<a class="button primary" href="/panel/">Вернуться ко входу</a></main></body></html>

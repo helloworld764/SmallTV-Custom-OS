@@ -22,7 +22,7 @@ class Health(BaseModel):
     status: Literal["ok"] = "ok"
 
 
-class SimulatorFiles(StaticFiles):
+class WebFiles(StaticFiles):
     async def get_response(self, path: str, scope: Scope) -> Response:
         response = await super().get_response(path, scope)
         if path.endswith('.mjs') and response.status_code == 200:
@@ -77,5 +77,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return RedirectResponse("/simulator/")
 
     simulator = Path(__file__).resolve().parents[2] / "web" / "simulator"
-    app.mount("/simulator", SimulatorFiles(directory=simulator, html=True), name="simulator")
+    app.mount("/simulator", WebFiles(directory=simulator, html=True), name="simulator")
+    panel = simulator.parent / "panel"
+    app.mount("/panel", WebFiles(directory=panel, html=True), name="panel")
     return app
