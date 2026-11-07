@@ -21,7 +21,7 @@ backend/migrations/  нумерованные SQL-миграции
 firmware/         описание будущего аппаратного компонента, без прошивки
 web/simulator/   HTML/CSS/JS симулятор, без сборщика и npm-зависимостей
 web/panel/       локальная веб-панель: вход, устройства и настройки
-codex-monitor/   диагностика CLI и описание будущего Windows-агента
+codex-monitor/   диагностика CLI, автономный JSONL-парсер, описание будущего агента
 docs/            архитектура и границы первого этапа
 tests/           Python API/config и JavaScript connection tests
 ```
@@ -165,6 +165,8 @@ API чтения устройств и изменения настроек тр�
 `.\.venv\Scripts\python.exe codex-monitor/check_cli.py`. Утилита вызывает только
 `--version`/`exec --help` и выводит безопасный JSON-отчёт. Сам Windows Monitor пока
 не реализован. Исследование источника событий: [docs/codex-cli-research.md](docs/codex-cli-research.md).
+Автономный парсер и его границы: [docs/exec-parser.md](docs/exec-parser.md).
+Он проверен на синтетических потоках и не запускает Codex/сетевую отправку.
 
 Повторный запуск сохраняет записи и не повторяет применённые миграции.
 База в `data/`, журналы SQLite, `.env` и тестовые файлы исключены из Git.
