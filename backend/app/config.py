@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -18,6 +18,14 @@ class Settings(BaseSettings):
     db_path: Path = Path("data/smalltv.sqlite3")
     cookie_secure: bool = False  # Local HTTP only; enable for future HTTPS hosting.
     session_ttl_seconds: int = Field(default=43200, ge=300, le=86400)
+    agent_stale_seconds: int = Field(default=30, ge=10, le=3600)
+    agent_offline_seconds: int = Field(default=90, ge=15, le=86400)
+
+    @model_validator(mode="after")
+    def validate_agent_timeouts(self):
+        if self.agent_offline_seconds <= self.agent_stale_seconds:
+            raise ValueError("agent_offline_seconds must exceed agent_stale_seconds")
+        return self
 
     @field_validator("db_path", mode="before")
     @classmethod

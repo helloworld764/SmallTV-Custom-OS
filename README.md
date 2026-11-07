@@ -119,6 +119,8 @@ python3 -m venv .venv
 | `SMALLTV_DB_PATH` | `data/smalltv.sqlite3` | Файл SQLite, относительный путь от рабочей папки или абсолютный |
 | `SMALLTV_COOKIE_SECURE` | `false` | `false` для локального HTTP; `true` для будущего HTTPS |
 | `SMALLTV_SESSION_TTL_SECONDS` | `43200` | Срок сессии в секундах, 300–86400 |
+| `SMALLTV_AGENT_STALE_SECONDS` | `30` | Через сколько секунд heartbeat устаревает, 10–3600 |
+| `SMALLTV_AGENT_OFFLINE_SECONDS` | `90` | Тайм-аут связи агента, 15–86400; больше stale |
 
 Пример смены порта на Windows:
 
@@ -151,8 +153,9 @@ API чтения устройств и изменения настроек тр�
 описаны в [docs/device-enrollment.md](docs/device-enrollment.md).
 Мастера привязки в панели и проверки физического устройства пока нет.
 Для будущего Windows Codex Monitor добавлены отдельные регистрации и ключи
-агентов: [docs/agent-identities.md](docs/agent-identities.md). Сам Monitor,
-heartbeat и события Codex ещё не реализованы. Пользовательские cookie, device-
+агентов: [docs/agent-identities.md](docs/agent-identities.md). Добавлены серверный
+приём heartbeat и состояние связи UNKNOWN/ONLINE/STALE/OFFLINE по серверному времени.
+Сам Monitor и события Codex ещё не реализованы. Пользовательские cookie, device-
 и agent-ключи не заменяют друг друга.
 
 Повторный запуск сохраняет записи и не повторяет применённые миграции.

@@ -59,6 +59,15 @@ const agentCredential = await client.request('/api/v1/agents/codex', {
   method: 'POST', body: { name: 'HTTP agent identity test' }, headers: { 'X-CSRF-Token': session.csrf_token },
 });
 const agentAuth = { Authorization: `Bearer ${agentCredential.token}` };
+const presencePath = `/api/v1/agents/codex/${agentCredential.agent_id}/presence`;
+assert.equal((await client.request(presencePath)).state, 'UNKNOWN');
+await client.request('/api/v1/agents/codex/heartbeat', { method: 'POST', body: {}, headers: agentAuth });
+const presence = await client.request(presencePath);
+assert.equal(presence.state, 'ONLINE');
+assert.ok(Number.isInteger(presence.last_seen_at));
+await assert.rejects(client.request('/api/v1/agents/codex/heartbeat', {
+  method: 'POST', body: { state: 'DONE' }, headers: agentAuth,
+}), error => error.status === 422);
 assert.deepEqual(await client.request('/api/v1/agents/codex/identity', { headers: agentAuth }),
   { agent_id: agentCredential.agent_id, kind: 'codex_windows' });
 await assert.rejects(client.request('/api/v1/agents/codex/identity', { headers: deviceAuth }), error => error.status === 401);
@@ -67,6 +76,10 @@ await client.request(`/api/v1/agents/codex/${agentCredential.agent_id}/credentia
   method: 'POST', headers: { 'X-CSRF-Token': session.csrf_token },
 });
 await assert.rejects(client.request('/api/v1/agents/codex/identity', { headers: agentAuth }), error => error.status === 401);
+assert.equal((await client.request(presencePath)).state, 'OFFLINE');
+await assert.rejects(client.request('/api/v1/agents/codex/heartbeat', {
+  method: 'POST', body: {}, headers: agentAuth,
+}), error => error.status === 401);
 for (const path of ['/panel/', '/simulator/?device=integration-tv', '/simulator/preview.mjs']) {
   assert.equal((await fetcher(path)).status, 200);
 }
@@ -75,4 +88,4 @@ try { await client.settings('integration-tv'); assert.fail('Session should be re
 catch (error) { assert.equal(error.status, 401); preview.fail(error.status); }
 assert.equal(preview.state, 'signed-out');
 assert.equal(preview.settings.theme, 'BlackArch Red');
-console.log('HTTP integration passed: authentication, SQLite, simulator preview, device enrollment/revocation and logout.');
+console.log('HTTP integration passed: authentication, SQLite, simulator preview, device enrollment, agent heartbeat/revocation and logout.');

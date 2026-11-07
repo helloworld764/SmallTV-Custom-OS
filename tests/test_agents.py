@@ -2,7 +2,9 @@ import secrets
 
 from fastapi.testclient import TestClient
 import pytest
+from pydantic import ValidationError
 
+from backend.app import agents
 from backend.app.backups import backup_database, restore_database
 from backend.app.config import Settings
 from backend.app.database import Database
@@ -145,3 +147,166 @@ def test_invalid_names_cannot_register_agents(env, name):
     assert env[0].post('/api/v1/agents/codex', headers=env[2], json={'name': name}).status_code == 422
     with env[1].connection() as connection:
         assert connection.execute('SELECT COUNT(*) FROM codex_agents').fetchone()[0] == 0
+
+
+def test_heartbeat_transitions_recovery_and_no_task_status(env, monkeypatch):
+    client = env[0]
+    credential = register(env)
+    path = f"/api/v1/agents/codex/{credential['agent_id']}/presence"
+    clock = [1000]
+    monkeypatch.setattr(agents, 'now', lambda: clock[0])
+    initial = client.get(path)
+    assert initial.status_code == 200 and initial.headers['cache-control'] == 'no-store'
+    assert initial.json() == {'agent_id': credential['agent_id'], 'state': 'UNKNOWN',
+                              'last_seen_at': None, 'server_time': 1000,
+                              'stale_after_seconds': 30, 'offline_after_seconds': 90}
+    reply = client.post('/api/v1/agents/codex/heartbeat', headers=bearer(credential), json={})
+    assert reply.status_code == 204 and not reply.content
+    for age, expected in [(0, 'ONLINE'), (29, 'ONLINE'), (30, 'STALE'), (89, 'STALE'), (90, 'OFFLINE'), (300, 'OFFLINE')]:
+        clock[0] = 1000 + age
+        state = client.get(path).json()
+        assert state['state'] == expected
+        assert state['last_seen_at'] == 1000
+        assert set(state) == set(initial.json())  # No fabricated run/task result.
+    assert client.post('/api/v1/agents/codex/heartbeat', headers=bearer(credential), json={}).status_code == 204
+    assert client.get(path).json()['state'] == 'ONLINE'
+    with env[1].connection() as connection:
+        assert connection.execute('SELECT COUNT(*) FROM agent_presence').fetchone()[0] == 1
+        assert connection.execute("SELECT COUNT(*) FROM audit_log WHERE action LIKE '%heartbeat%'").fetchone()[0] == 0
+
+
+def test_heartbeat_rate_limit_does_not_refresh_timestamp(env, monkeypatch):
+    client = env[0]
+    credential = register(env)
+    clock = [1000]
+    monkeypatch.setattr(agents, 'now', lambda: clock[0])
+    send = lambda: client.post('/api/v1/agents/codex/heartbeat', headers=bearer(credential), json={})
+    assert send().status_code == 204
+    clock[0] = 1004
+    response = send()
+    assert response.status_code == 429 and response.headers['retry-after'] == '1'
+    assert client.get(f"/api/v1/agents/codex/{credential['agent_id']}/presence").json()['last_seen_at'] == 1000
+    clock[0] = 1005
+    assert send().status_code == 204
+
+
+@pytest.mark.parametrize('payload', [{'state': 'DONE'}, {'agent_id': 'other'}, {'timestamp': 9999999999}, []])
+def test_heartbeat_rejects_client_status_identity_and_timestamp(env, payload):
+    credential = register(env)
+    assert env[0].post('/api/v1/agents/codex/heartbeat', headers=bearer(credential), json=payload).status_code == 422
+    with env[1].connection() as connection:
+        assert connection.execute('SELECT COUNT(*) FROM agent_presence').fetchone()[0] == 0
+
+
+def test_presence_access_and_heartbeat_credentials_are_separate(env):
+    client, _, _, _, _, password, _ = env
+    credential = register(env)
+    path = f"/api/v1/agents/codex/{credential['agent_id']}/presence"
+    assert client.post('/api/v1/agents/codex/heartbeat', json={}).status_code == 401
+    code = client.post('/api/v1/devices/enrollment-codes', headers=env[2], json={'name': 'Heartbeat test'}).json()
+    device = client.post('/api/v1/devices/enroll', json={'code': code['code']}).json()
+    assert client.post('/api/v1/agents/codex/heartbeat', headers=bearer(device), json={}).status_code == 401
+    client.cookies.clear()
+    assert client.get(path, headers=bearer(credential)).status_code == 401
+    response = client.post('/api/v1/auth/login', headers={'X-SmallTV-Client': 'web'}, json={'username': 'agent-other', 'password': password})
+    assert response.status_code == 200
+    assert client.get(path).status_code == 404
+    assert client.get('/api/v1/agents/codex/missing/presence').status_code == 404
+    assert client.post('/api/v1/agents/codex/heartbeat', headers=bearer(credential), json={}).status_code == 204
+
+
+def test_presence_survives_restart_with_age_and_configured_timeouts(env, monkeypatch):
+    client, database, _, _, _, _, _ = env
+    credential = register(env)
+    monkeypatch.setattr(agents, 'now', lambda: 1000)
+    assert client.post('/api/v1/agents/codex/heartbeat', headers=bearer(credential), json={}).status_code == 204
+    monkeypatch.setattr(agents, 'now', lambda: 1020)
+    settings = Settings(_env_file=None, db_path=database.path, agent_stale_seconds=10, agent_offline_seconds=20)
+    with TestClient(create_app(settings)) as restarted:
+        restarted.cookies.update(client.cookies)
+        state = restarted.get(f"/api/v1/agents/codex/{credential['agent_id']}/presence").json()
+        assert state['state'] == 'OFFLINE' and state['last_seen_at'] == 1000
+        assert (state['stale_after_seconds'], state['offline_after_seconds']) == (10, 20)
+
+
+def test_backward_clock_is_unknown_until_new_heartbeat(env, monkeypatch):
+    credential = register(env)
+    monkeypatch.setattr(agents, 'now', lambda: 1000)
+    env[0].post('/api/v1/agents/codex/heartbeat', headers=bearer(credential), json={})
+    monkeypatch.setattr(agents, 'now', lambda: 900)
+    path = f"/api/v1/agents/codex/{credential['agent_id']}/presence"
+    assert env[0].get(path).json()['state'] == 'UNKNOWN'
+    assert env[0].post('/api/v1/agents/codex/heartbeat', headers=bearer(credential), json={}).status_code == 204
+    assert env[0].get(path).json()['last_seen_at'] == 900
+
+
+def test_rotation_revoke_and_disabled_owner_cannot_keep_online(env):
+    client, database, csrf, owner, _, _, _ = env
+    credential = register(env)
+    agent_id = credential['agent_id']
+    path = f'/api/v1/agents/codex/{agent_id}/presence'
+    client.post('/api/v1/agents/codex/heartbeat', headers=bearer(credential), json={})
+    rotated = client.post(f'/api/v1/agents/codex/{agent_id}/credentials/rotate', headers=csrf).json()
+    assert client.get(path).json()['state'] == 'UNKNOWN'
+    assert client.post('/api/v1/agents/codex/heartbeat', headers=bearer(credential), json={}).status_code == 401
+    assert client.post('/api/v1/agents/codex/heartbeat', headers=bearer(rotated), json={}).status_code == 204
+    with database.transaction() as connection:
+        connection.execute('UPDATE local_accounts SET is_active = 0 WHERE user_id = ?', (owner,))
+    assert client.post('/api/v1/agents/codex/heartbeat', headers=bearer(rotated), json={}).status_code == 401
+    with database.transaction() as connection:
+        connection.execute('UPDATE local_accounts SET is_active = 1 WHERE user_id = ?', (owner,))
+    client.post(f'/api/v1/agents/codex/{agent_id}/credentials/revoke', headers=csrf)
+    assert client.get(path).json()['state'] == 'OFFLINE'
+    assert client.get(path).json()['last_seen_at'] is None
+
+
+def test_revoke_racing_authentication_cannot_write_heartbeat(env):
+    client, database, _, _, _, _, _ = env
+    credential = register(env)
+    def revoked_dependency():
+        with database.transaction() as connection:
+            connection.execute('UPDATE agent_credentials SET revoked_at = 1 WHERE agent_id = ?', (credential['agent_id'],))
+        return credential['agent_id']
+    client.app.dependency_overrides[agents.authenticated_agent] = revoked_dependency
+    assert client.post('/api/v1/agents/codex/heartbeat', headers=bearer(credential), json={}).status_code == 401
+    with database.connection() as connection:
+        assert connection.execute('SELECT COUNT(*) FROM agent_presence').fetchone()[0] == 0
+
+
+def test_restore_clears_heartbeat_without_touching_source(env, tmp_path):
+    credential = register(env)
+    assert env[0].post('/api/v1/agents/codex/heartbeat', headers=bearer(credential), json={}).status_code == 204
+    snapshot, restored = tmp_path / 'presence-backup.sqlite3', tmp_path / 'presence-restored.sqlite3'
+    backup_database(env[1].path, snapshot)
+    restore_database(snapshot, restored, active_database=env[1].path)
+    for path, expected in [(env[1].path, 1), (snapshot, 1), (restored, 0)]:
+        with Database(path).connection() as connection:
+            assert connection.execute('SELECT COUNT(*) FROM agent_presence').fetchone()[0] == expected
+
+
+@pytest.mark.parametrize('stale,offline', [(9, 90), (3601, 4000), (30, 30), (90, 30), (30, 86401)])
+def test_invalid_agent_timeouts_rejected(stale, offline):
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None, agent_stale_seconds=stale, agent_offline_seconds=offline)
+
+
+def test_agent_timeouts_from_environment(monkeypatch):
+    monkeypatch.setenv('SMALLTV_AGENT_STALE_SECONDS', '20')
+    monkeypatch.setenv('SMALLTV_AGENT_OFFLINE_SECONDS', '60')
+    settings = Settings(_env_file=None)
+    assert (settings.agent_stale_seconds, settings.agent_offline_seconds) == (20, 60)
+
+
+def test_presence_is_per_agent_and_admin_sees_disabled_owner_offline(env):
+    client, database, _, owner, _, password, _ = env
+    first, second = register(env), register(env)
+    assert client.post('/api/v1/agents/codex/heartbeat', headers=bearer(first), json={}).status_code == 204
+    paths = [f"/api/v1/agents/codex/{value['agent_id']}/presence" for value in (first, second)]
+    assert [client.get(path).json()['state'] for path in paths] == ['ONLINE', 'UNKNOWN']
+    create_account(database, 'presence-admin', password, 'Admin', role='super_admin', first_admin=True)
+    assert client.post('/api/v1/auth/login', headers={'X-SmallTV-Client': 'web'},
+                       json={'username': 'presence-admin', 'password': password}).status_code == 200
+    assert client.get(paths[0]).json()['state'] == 'ONLINE'
+    with database.transaction() as connection:
+        connection.execute('UPDATE local_accounts SET is_active = 0 WHERE user_id = ?', (owner,))
+    assert [client.get(path).json()['state'] for path in paths] == ['OFFLINE', 'OFFLINE']
