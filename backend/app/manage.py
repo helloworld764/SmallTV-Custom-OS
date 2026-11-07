@@ -11,7 +11,7 @@ from .security import create_account, normalize_username
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="SmallTV local account management")
+    parser = argparse.ArgumentParser(description="Storm OS local account management")
     commands = parser.add_subparsers(dest="command", required=True)
     bootstrap = commands.add_parser("create-admin", help="Create the first administrator only")
     bootstrap.add_argument("--username", required=True)

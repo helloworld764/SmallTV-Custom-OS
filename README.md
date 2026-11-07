@@ -1,4 +1,13 @@
-# SmallTV Custom OS
+# Storm OS
+
+**Storm OS** (кратко **Storm**) — система и прошивка для GEEKMAGIC SmallTV-Ultra.
+Веб-панель — **Storm Control Panel**, симулятор 240×240 — **Storm Simulator**,
+будущий единый Telegram-бот — **Storm Bot**. На экране загрузки прошивки используется Storm OS.
+Реальная прошивка и Storm Bot пока не реализованы.
+
+Техническое имя GitHub-репозитория остаётся `SmallTV-Custom-OS`.
+Пакет `backend`, идентификаторы `smalltv`, переменные `SMALLTV_`, API, JSON-ключи,
+таблицы SQLite, миграции и пути конфигурации сохранены для совместимости.
 
 FastAPI backend, SQLite, веб-панель управления и симулятор дисплея 240×240.
 Требования проекта находятся в `TZ.md`, правила работы — в `AGENTS.md`.
@@ -55,8 +64,8 @@ python3 -m venv .venv
 После запуска откройте:
 
 - `http://127.0.0.1:8000/health` → `{"status":"ok"}`
-- `http://127.0.0.1:8000/panel/` → панель управления
-- `http://127.0.0.1:8000/simulator/` → дисплей 240×240
+- `http://127.0.0.1:8000/panel/` → Storm Control Panel
+- `http://127.0.0.1:8000/simulator/` → Storm Simulator, дисплей 240×240
 - `http://127.0.0.1:8000/docs` → OpenAPI
 
 Симулятор обслуживается backend и использует относительный `/health`, без CORS
@@ -217,14 +226,14 @@ Windows:
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest
-node --test tests/simulator.test.mjs tests/panel.test.mjs
+node --test tests/simulator.test.mjs tests/panel.test.mjs tests/branding.test.mjs
 ```
 
 Debian:
 
 ```bash
 .venv/bin/python -m pytest
-node --test tests/simulator.test.mjs tests/panel.test.mjs
+node --test tests/simulator.test.mjs tests/panel.test.mjs tests/branding.test.mjs
 ```
 
 Node.js 20+ нужен только для JavaScript-тестов; симулятор работает в современном

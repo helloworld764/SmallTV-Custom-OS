@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>SmallTV — панель управления</title>
+  <title>Storm Control Panel</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <header class="topbar">
-    <a class="brand" href="/panel/" aria-label="SmallTV — главная"><span class="brand-mark" aria-hidden="true">S</span> SmallTV <span class="brand-caption">CUSTOM OS</span></a>
-    <a class="simulator-link" href="/simulator/" target="_blank" rel="noopener">Открыть симулятор <span aria-hidden="true">↗</span></a>
+    <a class="brand" href="/panel/" aria-label="Storm OS — главная"><span class="brand-mark" aria-hidden="true">S</span> Storm <span class="brand-caption">OS</span></a>
+    <a class="simulator-link" href="/simulator/" target="_blank" rel="noopener">Storm Simulator <span aria-hidden="true">↗</span></a>
   </header>
   <main>
     <div id="message" class="message" role="alert" hidden></div>
@@ -21,12 +21,12 @@
       <div class="intro">
         <p class="eyebrow">ВАШЕ ПРОСТРАНСТВО</p>
         <h1>Маленький экран.<br><span>Ваши настройки.</span></h1>
-        <p class="lead">Управляйте своими SmallTV из одной панели.</p>
-        <div class="display-motif" aria-hidden="true"><div><span class="motif-dot"></span><strong>240<span>×</span>240</strong><small>SMALLTV CUSTOM OS</small></div></div>
+        <p class="lead">Управляйте устройствами со Storm OS из одной панели.</p>
+        <div class="display-motif" aria-hidden="true"><div><span class="motif-dot"></span><strong>240<span>×</span>240</strong><small>Storm OS</small></div></div>
         <p class="intro-note">Оформление · Яркость · Стартовый экран</p>
       </div>
       <section class="card login-card" aria-labelledby="login-title">
-        <p class="eyebrow">ПАНЕЛЬ УПРАВЛЕНИЯ</p>
+        <p class="eyebrow">Storm Control Panel</p>
         <h2 id="login-title">Вход в аккаунт</h2>
         <p class="muted">Используйте свой логин и пароль.</p>
         <form id="login-form">
@@ -43,15 +43,15 @@
     </section>
     <section id="dashboard" hidden aria-labelledby="devices-title">
       <div class="dashboard-heading">
-        <div><p class="eyebrow">ПАНЕЛЬ УПРАВЛЕНИЯ</p><h1 id="devices-title">Мои устройства</h1></div>
+        <div><p class="eyebrow">Storm Control Panel</p><h1 id="devices-title">Мои устройства</h1></div>
         <div class="account"><div><strong id="account-name"></strong><span id="account-role"></span></div><button id="logout" class="secondary" type="button">Выйти</button></div>
       </div>
       <div class="section-heading"><p class="muted" id="device-count"></p><button id="refresh" class="text-button" type="button">Обновить список</button></div>
       <section id="empty" class="card empty-state" hidden>
         <div class="empty-icon" aria-hidden="true">□</div><h2>Устройств пока нет</h2>
         <p>Здесь появятся устройства, привязанные к вашему аккаунту.</p>
-        <p class="muted">SmallTV ещё в пути? Можно познакомиться с локальным симулятором.</p>
-        <a class="button secondary" href="/simulator/" target="_blank" rel="noopener">Открыть симулятор ↗</a>
+        <p class="muted">SmallTV ещё в пути? Можно познакомиться со Storm Simulator.</p>
+        <a class="button secondary" href="/simulator/" target="_blank" rel="noopener">Открыть Storm Simulator ↗</a>
       </section>
       <div id="device-workspace" class="workspace" hidden>
         <aside class="card device-sidebar" aria-label="Выбор устройства"><div id="device-list"></div><button id="load-more" class="secondary" type="button" hidden>Показать ещё</button></aside>
@@ -79,7 +79,7 @@
     </section>
     <noscript><p class="message">Для работы панели необходимо разрешить JavaScript в браузере.</p></noscript>
   </main>
-  <footer class="page-footer"><span>SmallTV Custom OS</span><span id="connection">Доступность сервера ещё не проверена</span></footer>
+  <footer class="page-footer"><span>Storm OS</span><span id="connection">Доступность сервера ещё не проверена</span></footer>
   <script type="module" src="panel.mjs"></script>
 </body>
 </html>

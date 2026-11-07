@@ -41,7 +41,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         await run_in_threadpool(database.initialize)
         yield
 
-    app = FastAPI(title="SmallTV Custom OS", version="0.1.0", lifespan=lifespan)
+    app = FastAPI(title="Storm OS", version="0.1.0", lifespan=lifespan)
     app.state.settings = settings
     app.state.database = database
 
