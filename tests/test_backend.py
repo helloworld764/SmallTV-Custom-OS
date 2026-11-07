@@ -1,3 +1,5 @@
+import mimetypes
+
 import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
@@ -32,6 +34,16 @@ def test_simulator_and_assets_are_served(client):
 def test_unknown_route_and_method(client):
     assert client.get('/missing').status_code == 404
     assert client.post('/health').status_code == 405
+
+
+def test_modules_have_javascript_mime_even_with_windows_plaintext_mapping(client, monkeypatch):
+    # Reproduce the MIME mapping observed in the running Windows server.
+    mimetypes.init()
+    monkeypatch.setitem(mimetypes.types_map, '.mjs', 'text/plain')
+    for asset in ('simulator.mjs', 'connection.mjs'):
+        response = client.get(f'/simulator/{asset}')
+        assert response.status_code == 200
+        assert response.headers['content-type'] == 'text/javascript; charset=utf-8'
 
 
 def test_environment_overrides(monkeypatch):
