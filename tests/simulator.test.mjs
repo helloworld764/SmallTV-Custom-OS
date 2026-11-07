@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Connection, checkHealth } from '../web/simulator/connection.mjs';
+import { PreviewSettings } from '../web/simulator/preview.mjs';
 
 test('startup does not claim success or emit a recovery notice', () => {
   const c = new Connection();
@@ -61,4 +62,53 @@ test('HTTP, invalid payload, JSON and network failures cannot become online', as
   ]) {
     await assert.rejects(checkHealth(fetcher, new AbortController().signal));
   }
+});
+
+test('standalone preview needs no account and settings start as unconfirmed', () => {
+  const standalone = new PreviewSettings();
+  assert.equal(standalone.state, 'standalone');
+  assert.equal(standalone.screenTitle, 'Часы');
+  const device = new PreviewSettings('device-test');
+  assert.equal(device.state, 'loading');
+  assert.equal(device.updatedAt, null);
+});
+
+test('preview updates theme, brightness and start screen from authorized settings', () => {
+  const preview = new PreviewSettings('device-test');
+  preview.apply({ device_id: 'device-test', brightness: 0, theme: 'Light', start_screen: 'weather' }, 1000);
+  assert.equal(preview.state, 'fresh');
+  assert.equal(preview.theme, 'light');
+  assert.equal(preview.settings.brightness, 0);
+  assert.equal(preview.screenTitle, 'Погода');
+  assert.equal(preview.updatedAt, 1000);
+});
+
+test('network outage keeps cached settings stale and recovery replaces them', () => {
+  const preview = new PreviewSettings('device-test');
+  const initial = { device_id: 'device-test', brightness: 25, theme: 'Purple', start_screen: 'clock' };
+  preview.apply(initial, 1000);
+  preview.fail(0);
+  assert.equal(preview.state, 'stale');
+  assert.deepEqual(preview.settings, initial);
+  preview.apply({ ...initial, brightness: 50 }, 2000);
+  assert.equal(preview.state, 'fresh');
+  assert.equal(preview.settings.brightness, 50);
+});
+
+test('expired session or denied ownership clears private cached settings', () => {
+  for (const status of [401, 403, 404]) {
+    const preview = new PreviewSettings('device-test');
+    preview.apply({ device_id: 'device-test', brightness: 5, theme: 'Purple', start_screen: 'null' }, 1000);
+    preview.fail(status);
+    assert.equal(preview.state, status === 401 ? 'signed-out' : 'unavailable');
+    assert.equal(preview.updatedAt, null);
+    assert.equal(preview.settings.theme, 'BlackArch Red');
+  }
+});
+
+test('wrong-device data cannot enter preview cache', () => {
+  const preview = new PreviewSettings('device-test');
+  assert.throws(() => preview.apply({ device_id: 'other', theme: 'Purple' }, 1000));
+  assert.equal(preview.state, 'loading');
+  assert.equal(preview.updatedAt, null);
 });

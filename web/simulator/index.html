@@ -12,16 +12,19 @@
     <p>Симулятор дисплея · 240 × 240</p>
     <p><a href="/panel/">Панель управления →</a></p>
     <div class="case">
-      <section class="display" aria-label="Дисплей SmallTV 240 на 240 пикселей">
+      <section class="display" data-theme="red" aria-label="Дисплей SmallTV 240 на 240 пикселей">
         <header>SMALLTV <span id="indicator" data-state="unknown" role="img" aria-label="Доступность неизвестна"></span></header>
-        <div id="clock">--:--:--</div>
-        <div id="date"></div>
+        <div id="screen-content">
+          <div id="clock-content"><div id="clock">--:--:--</div><div id="date"></div></div>
+          <div id="placeholder" hidden><strong id="screen-title"></strong><p>Экран ещё не подключён</p></div>
+        </div>
         <div id="status" role="status">Проверка связи…</div>
         <div id="notice" hidden></div>
         <footer>ЛОКАЛЬНЫЙ СИМУЛЯТОР</footer>
       </section>
     </div>
     <p id="checked">Успешных проверок ещё нет.</p>
+    <p id="preview-status" role="status">Автономное превью часов.</p>
     <p>Индикатор показывает доступность API, а не питание ноутбука.<br>
        Часы используют время и часовой пояс браузера.</p>
     <details>

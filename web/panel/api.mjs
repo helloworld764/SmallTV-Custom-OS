@@ -53,12 +53,12 @@ export class ApiClient {
     return rows;
   }
   async settings(id) {
-    return settingsData(await this.request(`/api/v1/devices/${encodeURIComponent(id)}/settings`));
+    return settingsData(await this.request(`/api/v1/devices/${encodeURIComponent(id)}/settings`), id);
   }
   async save(id, changes, csrf) {
     return settingsData(await this.request(`/api/v1/devices/${encodeURIComponent(id)}/settings`, {
       method: 'PATCH', body: changes, headers: { 'X-CSRF-Token': csrf },
-    }));
+    }), id);
   }
 }
 
@@ -70,9 +70,9 @@ function sessionData(value) {
   return value;
 }
 
-function settingsData(value) {
+function settingsData(value, expectedId) {
   if (!value || !Number.isInteger(value.brightness) || value.brightness < 0 || value.brightness > 100
-      || typeof value.device_id !== 'string' || typeof value.theme !== 'string' || typeof value.start_screen !== 'string') {
+      || value.device_id !== expectedId || typeof value.theme !== 'string' || typeof value.start_screen !== 'string') {
     throw new ApiError(502, 'protocol');
   }
   return value;
@@ -81,4 +81,11 @@ function settingsData(value) {
 export function changesFrom(previous, draft) {
   return Object.fromEntries(['brightness', 'theme', 'start_screen']
     .filter(key => draft[key] !== previous[key]).map(key => [key, draft[key]]));
+}
+
+export function hasDraftChanges(previous, draft) {
+  if (!previous) return false;
+  const brightness = Number(draft.brightness);
+  return String(draft.brightness).trim() === '' || !Number.isFinite(brightness)
+    || Object.keys(changesFrom(previous, { ...draft, brightness })).length !== 0;
 }

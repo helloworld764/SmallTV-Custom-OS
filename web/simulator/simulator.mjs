@@ -1,6 +1,11 @@
 import { Connection, checkHealth } from './connection.mjs';
+import { ApiClient } from '../panel/api.mjs';
+import { PreviewSettings, THEMES } from './preview.mjs';
 
 const connection = new Connection();
+const deviceId = new URLSearchParams(window.location.search).get('device');
+const preview = new PreviewSettings(deviceId);
+const api = new ApiClient({ timeout: 2500 });
 const indicator = document.querySelector('#indicator');
 const status = document.querySelector('#status');
 const checked = document.querySelector('#checked');
@@ -10,6 +15,26 @@ const labels = {
   stale: 'Данные устарели · проверяем', offline: 'Связь с backend потеряна',
 };
 let noticeTimer;
+
+function renderPreview() {
+  const settings = preview.settings;
+  document.querySelector('.display').dataset.theme = preview.theme;
+  document.querySelector('#screen-content').style.opacity = preview.canDisplaySettings ? settings.brightness / 100 : 0;
+  const clock = settings.start_screen === 'clock';
+  document.querySelector('#clock-content').hidden = !clock;
+  document.querySelector('#placeholder').hidden = clock;
+  document.querySelector('#screen-title').textContent = preview.screenTitle;
+  const labels = {
+    standalone: 'Автономное превью часов. Откройте превью из настроек устройства, чтобы читать их с сервера.',
+    loading: 'Читаем сохранённые настройки устройства…',
+    fresh: `Настройки с сервера: ${settings.theme}, яркость ${settings.brightness}%, стартовый экран «${preview.screenTitle}».`,
+    stale: preview.updatedAt === null ? 'Настройки не загружены. Сервер временно недоступен.' : 'Настройки устарели: показана последняя полученная версия.',
+    'signed-out': 'Для просмотра настроек войдите в панель управления. Локальные часы и проверка backend продолжают работать.',
+    unavailable: 'Устройство или его настройки недоступны этому аккаунту.',
+  };
+  document.querySelector('#preview-status').textContent = labels[preview.state]
+    + (preview.state === 'fresh' && !THEMES[settings.theme] ? ' Тема пока не поддержана в превью; использована BlackArch Red.' : '');
+}
 
 function render() {
   indicator.dataset.state = connection.state;
@@ -40,6 +65,13 @@ async function poll() {
     noticeTimer = setTimeout(() => { notice.hidden = true; }, 4000);
   }
   render();
+  if (deviceId) {
+    if (ok) {
+      try { preview.apply(await api.settings(deviceId), Date.now()); }
+      catch (error) { preview.fail(error.status); }
+    } else preview.fail();
+    renderPreview();
+  }
   // Schedule only after completion: requests cannot overlap.
   setTimeout(poll, connection.delay);
 }
@@ -55,5 +87,6 @@ function tick() {
 }
 
 tick();
+renderPreview();
 setInterval(tick, 1000);
 poll();

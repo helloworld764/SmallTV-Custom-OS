@@ -57,6 +57,7 @@
         <aside class="card device-sidebar" aria-label="Выбор устройства"><div id="device-list"></div><button id="load-more" class="secondary" type="button" hidden>Показать ещё</button></aside>
         <section class="card settings-card" aria-labelledby="settings-title">
           <p class="eyebrow">НАСТРОЙКИ УСТРОЙСТВА</p><h2 id="settings-title">Выберите устройство</h2>
+          <a id="device-preview" class="button secondary" target="_blank" rel="noopener" hidden>Открыть превью устройства ↗</a>
           <p id="settings-loading" class="muted" hidden>Загружаем настройки…</p>
           <form id="settings-form" hidden>
             <fieldset id="settings-fields">
@@ -67,8 +68,9 @@
               <select id="theme" name="theme"><option>BlackArch Red</option><option>Dark Blue</option><option>Purple</option><option>Light</option></select>
               <label for="start-screen">Стартовый экран</label>
               <select id="start-screen" name="start_screen"><option value="clock">Часы</option><option value="weather">Погода</option><option value="monitor">Мониторинг</option><option value="codex">Codex</option><option value="null">Null</option><option value="tamagotchi">Tamagotchi</option></select>
-              <p class="hint">Настройки сохраняются на сервере. Доставка на реальный SmallTV пока не подключена.</p>
-              <div class="save-row"><button class="primary" type="submit">Сохранить настройки</button><button id="reload-settings" class="text-button" type="button">Перечитать с сервера</button></div>
+              <p class="hint">Настройки сохраняются на сервере и отображаются в превью устройства. Доставка на реальный SmallTV пока не подключена.</p>
+              <p id="dirty-note" class="hint" role="status" hidden>Есть несохранённые изменения.</p>
+              <div class="save-row"><button class="primary" type="submit">Сохранить настройки</button><button id="discard-settings" class="text-button" type="button">Отменить изменения</button><button id="reload-settings" class="text-button" type="button">Перечитать с сервера</button></div>
             </fieldset>
           </form>
           <p id="save-result" class="save-result" role="status"></p>

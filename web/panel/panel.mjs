@@ -1,4 +1,4 @@
-import { ApiClient, ApiError, changesFrom } from './api.mjs';
+import { ApiClient, ApiError, changesFrom, hasDraftChanges } from './api.mjs';
 
 const $ = selector => document.querySelector(selector);
 const state = { session: null, devices: [], selected: null, settings: null, busy: false, more: false };
@@ -6,6 +6,20 @@ const api = new ApiClient({ onConnection(online) {
   $('#connection').textContent = online ? 'Последний запрос: сервер доступен' : 'Нет связи с сервером';
   $('#connection').dataset.state = online ? 'online' : 'offline';
 } });
+
+function draft() {
+  return { brightness: $('#brightness').value, theme: $('#theme').value, start_screen: $('#start-screen').value };
+}
+
+function dirty() {
+  return !$('#settings-form').hidden && hasDraftChanges(state.settings, draft());
+}
+
+function canLeaveSettings() {
+  if (!dirty()) return true;
+  message('Есть несохранённые настройки. Сначала сохраните их или нажмите «Отменить изменения».');
+  return false;
+}
 
 function message(text = '') {
   $('#message').textContent = text;
@@ -27,6 +41,7 @@ function loginView(text = '') {
   $('#device-list').replaceChildren();
   $('#settings-form').reset();
   $('#settings-form').hidden = true;
+  $('#device-preview').hidden = true;
   $('#account-name').textContent = '';
   $('#account-role').textContent = '';
   $('#save-result').textContent = '';
@@ -48,6 +63,7 @@ function handleError(error, context = '') {
   } else if (error instanceof ApiError && error.status === 404) {
     state.settings = null;
     $('#settings-form').hidden = true;
+    $('#device-preview').hidden = true;
     message('Устройство или его настройки недоступны. Обновите список устройств.');
   } else if (error instanceof ApiError && error.status === 422) {
     message('Проверьте введённые значения и повторите.');
@@ -81,7 +97,7 @@ function renderList() {
     const id = document.createElement('small');
     id.textContent = device.id;
     button.append(name, id);
-    button.addEventListener('click', () => run(() => selectDevice(device.id)));
+    button.addEventListener('click', () => { if (canLeaveSettings()) run(() => selectDevice(device.id)); });
     $('#device-list').append(button);
   }
   $('#device-count').textContent = `Загружено устройств: ${state.devices.length}`;
@@ -103,17 +119,21 @@ function selectValue(select, value) {
 }
 
 function renderSettings() {
+  $('#device-preview').href = `/simulator/?device=${encodeURIComponent(state.selected)}`;
+  $('#device-preview').hidden = false;
   $('#brightness').value = state.settings.brightness;
   $('#brightness-range').value = state.settings.brightness;
   selectValue($('#theme'), state.settings.theme);
   selectValue($('#start-screen'), state.settings.start_screen);
   $('#settings-form').hidden = false;
+  $('#dirty-note').hidden = true;
 }
 
 async function selectDevice(id) {
   state.selected = id;
   state.settings = null;
   $('#settings-form').hidden = true;
+  $('#device-preview').hidden = true;
   $('#save-result').textContent = '';
   $('#settings-title').textContent = state.devices.find(device => device.id === id)?.name || 'Настройки устройства';
   $('#settings-loading').hidden = false;
@@ -126,6 +146,7 @@ async function selectDevice(id) {
 }
 
 async function loadDevices(append = false) {
+  const previousSelection = state.selected;
   const rows = await api.devices(append ? state.devices.length : 0);
   state.devices = append ? [...state.devices, ...rows] : rows;
   state.more = rows.length === 50;
@@ -134,8 +155,9 @@ async function loadDevices(append = false) {
     state.selected = null;
     state.settings = null;
     $('#settings-form').hidden = true;
+    $('#device-preview').hidden = true;
     $('#save-result').textContent = '';
-    if (rows.length) await selectDevice(rows[0].id);
+    if (rows.length) await selectDevice(rows.some(device => device.id === previousSelection) ? previousSelection : rows[0].id);
   }
 }
 
@@ -147,6 +169,7 @@ async function dashboard(session) {
   state.more = false;
   renderList();
   $('#settings-form').hidden = true;
+  $('#device-preview').hidden = true;
   $('#boot').hidden = true;
   $('#login-view').hidden = true;
   $('#dashboard').hidden = false;
@@ -174,14 +197,27 @@ $('#login-form').addEventListener('submit', event => {
   $('#password').value = '';
   run(async () => { await dashboard(await api.login(username, password)); }, 'login');
 });
-$('#logout').addEventListener('click', () => run(async () => {
-  await api.logout(state.session.csrf_token);
-  loginView();
-  $('#username').focus();
-}, 'logout'));
-$('#refresh').addEventListener('click', () => run(() => loadDevices()));
+$('#logout').addEventListener('click', () => {
+  if (!canLeaveSettings()) return;
+  run(async () => {
+    await api.logout(state.session.csrf_token);
+    loginView();
+    $('#username').focus();
+  }, 'logout');
+});
+$('#refresh').addEventListener('click', () => { if (canLeaveSettings()) run(() => loadDevices()); });
 $('#load-more').addEventListener('click', () => run(() => loadDevices(true)));
-$('#reload-settings').addEventListener('click', () => run(() => selectDevice(state.selected)));
+$('#reload-settings').addEventListener('click', () => { if (canLeaveSettings()) run(() => selectDevice(state.selected)); });
+$('#discard-settings').addEventListener('click', () => {
+  if (!state.settings) return;
+  renderSettings();
+  message();
+  $('#save-result').textContent = 'Несохранённые изменения отменены.';
+});
+$('#settings-form').addEventListener('input', () => {
+  $('#save-result').textContent = '';
+  $('#dirty-note').hidden = !dirty();
+});
 $('#brightness').addEventListener('input', () => { $('#brightness-range').value = $('#brightness').value; });
 $('#brightness-range').addEventListener('input', () => { $('#brightness').value = $('#brightness-range').value; });
 $('#settings-form').addEventListener('submit', event => {
@@ -209,4 +245,7 @@ setInterval(() => {
   }, '', false);
 }, 30000);
 window.addEventListener('pageshow', event => { if (event.persisted) run(bootstrap); });
+window.addEventListener('beforeunload', event => {
+  if (dirty()) { event.preventDefault(); event.returnValue = ''; }
+});
 run(bootstrap);

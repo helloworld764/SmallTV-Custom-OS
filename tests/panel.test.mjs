@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ApiClient, ApiError, changesFrom } from '../web/panel/api.mjs';
+import { ApiClient, ApiError, changesFrom, hasDraftChanges } from '../web/panel/api.mjs';
 
 const csrf = 'a'.repeat(64); // Deliberately synthetic, not a credential.
 const session = { user: { id: 'user-test', display_name: 'Test', role: 'user' }, csrf_token: csrf };
@@ -38,7 +38,7 @@ test('saving settings encodes resource identifiers and sends session CSRF', asyn
     assert.equal(options.method, 'PATCH');
     assert.equal(options.headers['X-CSRF-Token'], csrf);
     assert.deepEqual(JSON.parse(options.body), { brightness: 10 });
-    return reply({ ...settings, brightness: 10 });
+    return reply({ ...settings, device_id: 'device/?#', brightness: 10 });
   } });
   assert.equal((await client.save('device/?#', { brightness: 10 }, csrf)).brightness, 10);
 });
@@ -99,4 +99,19 @@ test('only changed settings are sent, including a valid zero brightness', () => 
   assert.deepEqual(changesFrom(settings, settings), {});
   assert.deepEqual(changesFrom(settings, { ...settings, brightness: 0, owner_id: 'ignored' }), { brightness: 0 });
   assert.deepEqual(changesFrom(settings, { ...settings, theme: 'Light', start_screen: 'weather' }), { theme: 'Light', start_screen: 'weather' });
+});
+
+test('a response for another device cannot be accepted as a read or save success', async () => {
+  const client = new ApiClient({ fetcher: async () => reply(settings) });
+  await assert.rejects(client.settings('another-device'), error => error.kind === 'protocol');
+  await assert.rejects(client.save('another-device', { brightness: 10 }, csrf), error => error.kind === 'protocol');
+});
+
+test('draft protection distinguishes unchanged input, zero brightness and invalid empty input', () => {
+  assert.equal(hasDraftChanges(settings, { ...settings, brightness: '70' }), false);
+  assert.equal(hasDraftChanges(settings, { ...settings, brightness: '0' }), true);
+  assert.equal(hasDraftChanges({ ...settings, brightness: 0 }, { ...settings, brightness: '' }), true);
+  assert.equal(hasDraftChanges(settings, { ...settings, brightness: 'invalid' }), true);
+  assert.equal(hasDraftChanges(settings, { ...settings, theme: 'Purple' }), true);
+  assert.equal(hasDraftChanges(null, settings), false);
 });

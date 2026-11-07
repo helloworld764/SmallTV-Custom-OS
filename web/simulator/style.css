@@ -4,15 +4,23 @@ main { max-width: 620px; margin: auto; }
 h1 { font-size: 26px; margin-bottom: 8px; }
 p { color: #b7b7c2; line-height: 1.6; }
 .case { display: inline-block; padding: 18px; background: #242429; border: 1px solid #42424a; border-radius: 24px; margin: 12px 0; }
-.display { width: 240px; height: 240px; box-sizing: border-box; background: #080809; color: #f4f4f6; position: relative; overflow: hidden; padding: 16px; border-radius: 3px; }
-header { font-size: 12px; letter-spacing: 2px; color: #ff5264; display: flex; align-items: center; justify-content: space-between; }
+.display { --screen-bg: #080809; --screen-text: #f4f4f6; --screen-accent: #ff5264; width: 240px; height: 240px; box-sizing: border-box; background: var(--screen-bg); color: var(--screen-text); position: relative; overflow: hidden; padding: 16px; border-radius: 3px; }
+.display[data-theme=blue] { --screen-bg: #08101e; --screen-text: #e2edff; --screen-accent: #70a7ff; }
+.display[data-theme=purple] { --screen-bg: #130b1c; --screen-text: #f3e6ff; --screen-accent: #cc96fa; }
+.display[data-theme=light] { --screen-bg: #f3f4f7; --screen-text: #20232c; --screen-accent: #a71933; }
+[hidden] { display: none !important; }
+header { font-size: 12px; letter-spacing: 2px; color: var(--screen-accent); display: flex; align-items: center; justify-content: space-between; }
 #indicator { width: 10px; height: 10px; border-radius: 50%; background: #f5c84c; flex: none; }
 #indicator[data-state="online"] { background: #4bdb94; }
 #indicator[data-state="offline"] { background: #ff5264; }
-#clock { font: 36px ui-monospace, monospace; margin-top: 40px; text-align: center; }
+#screen-content { height: 112px; margin-top: 30px; }
+#clock { font: 36px ui-monospace, monospace; text-align: center; padding-top: 10px; }
+#placeholder { text-align: center; padding-top: 12px; }
+#placeholder strong { font-size: 20px; }
+#placeholder p { font-size: 12px; color: var(--screen-text); }
 #date { font-size: 13px; text-align: center; margin-top: 8px; }
-#status { font-size: 12px; color: #b7b7c2; text-align: center; margin-top: 20px; }
+#status { font-size: 11px; color: var(--screen-text); text-align: center; margin-top: 6px; }
 footer { position: absolute; bottom: 12px; font-size: 9px; letter-spacing: 1px; color: #9999a4; }
-#notice { position: absolute; inset: 54px 8px 44px; background: #161619; border: 1px solid #ff5264; padding: 28px 8px; box-sizing: border-box; text-align: center; font-size: 17px; }
+#notice { position: absolute; inset: 54px 8px 44px; background: var(--screen-bg); border: 1px solid var(--screen-accent); padding: 28px 8px; box-sizing: border-box; text-align: center; font-size: 17px; }
 details { max-width: 500px; }
 summary { cursor: pointer; }
