@@ -8,6 +8,8 @@ import warnings
 from .config import Settings
 from .database import Database
 from .security import create_account, normalize_username
+from .backups import BackupError, backup_database, default_backup_path, restore_database, verify_backup
+from pathlib import Path
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -16,7 +18,34 @@ def main(argv: list[str] | None = None) -> int:
     bootstrap = commands.add_parser("create-admin", help="Create the first administrator only")
     bootstrap.add_argument("--username", required=True)
     bootstrap.add_argument("--display-name")
+    backup = commands.add_parser("backup-db", help="Create and verify a new SQLite snapshot")
+    output = backup.add_mutually_exclusive_group()
+    output.add_argument("--output", type=Path)
+    output.add_argument("--directory", type=Path, default=Path('backups'))
+    verify = commands.add_parser("verify-backup", help="Verify a SQLite snapshot without changing it")
+    verify.add_argument("--source", type=Path, required=True)
+    restore = commands.add_parser("restore-db", help="Restore into a new file and revoke restored sessions")
+    restore.add_argument("--source", type=Path, required=True)
+    restore.add_argument("--output", type=Path, required=True)
+    for command in (backup, verify, restore):
+        command.add_argument("--timeout-seconds", type=float, default=30)
     args = parser.parse_args(argv)
+    if args.command != 'create-admin':
+        try:
+            if args.command == 'backup-db':
+                target = args.output if args.output is not None else default_backup_path(args.directory)
+                report = backup_database(Settings().db_path, target, timeout=args.timeout_seconds)
+            elif args.command == 'verify-backup':
+                report = verify_backup(args.source, timeout=args.timeout_seconds)
+            else:
+                report = restore_database(args.source, args.output, active_database=Settings().db_path,
+                                          timeout=args.timeout_seconds)
+        except (BackupError, OSError, ValueError) as error:
+            parser.exit(1, f"Database operation failed: {error}\n")
+        print(f"Verified SQLite file (schema {report.schema_version}): {report.path}")
+        if args.command == 'restore-db':
+            print("Restored sessions revoked. Active database and configuration were not changed.")
+        return 0
     try:
         username = normalize_username(args.username)
         # Refuse getpass's echoing fallback when there is no usable terminal.

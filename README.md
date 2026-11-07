@@ -11,7 +11,7 @@
 
 FastAPI backend, SQLite, веб-панель управления и симулятор дисплея 240×240.
 Требования проекта находятся в `TZ.md`, правила работы — в `AGENTS.md`.
-В подготовленной рабочей копии эти документы сохранены без изменений.
+Изменения требований и правил требуют согласования владельца; ребрендинг отражён в ТЗ v1.2.
 
 ## Структура
 
@@ -168,6 +168,26 @@ SMALLTV_DB_PATH=data/development.sqlite3 .venv/bin/python -m backend.app
 ```
 
 Подробности схемы и правила будущих миграций: [docs/database.md](docs/database.md).
+
+## Резервное копирование SQLite
+
+Из корня проекта на Windows:
+
+```powershell
+.\.venv\Scripts\python.exe -m backend.app.manage backup-db
+.\.venv\Scripts\python.exe -m backend.app.manage verify-backup --source backups/manual-copy.sqlite3
+.\.venv\Scripts\python.exe -m backend.app.manage restore-db --source backups/manual-copy.sqlite3 --output data/restored-check.sqlite3
+```
+
+В последних двух командах замените `manual-copy.sqlite3` на фактическое имя копии,
+показанное первой командой. Для явного имени используйте `backup-db --output
+backups/manual-copy.sqlite3`. При повторном запуске существующий файл не заменяется.
+Источник копируется через SQLite Backup API, а результат проверяется.
+Восстановление создаёт только новый файл и отзывает сессии в нём; рабочая БД,
+`.env` и работающий backend автоматически не переключаются.
+Копии содержат чувствительные данные, не зашифрованы и исключены из Git.
+Подробные инструкции, ограничения и хранение вне ноутбука: [docs/backups.md](docs/backups.md).
+Карта оставшихся требований и порядок согласования будущих функций: [docs/roadmap.md](docs/roadmap.md).
 
 ## Первый администратор и вход
 

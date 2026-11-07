@@ -9,10 +9,46 @@ from collections.abc import Iterator
 
 
 MIGRATIONS = Path(__file__).resolve().parents[1] / "migrations"
+MIGRATION_TABLE_SQL = """
+                CREATE TABLE IF NOT EXISTS schema_migrations (
+                    version INTEGER PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    checksum TEXT NOT NULL,
+                    applied_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+                )
+            """
 
 
 class MigrationError(RuntimeError):
     """Migration history and available source files are incompatible."""
+
+
+def read_migrations(directory: Path = MIGRATIONS) -> list[tuple[int, str, str, str]]:
+    files = sorted(Path(directory).glob("*.sql"))
+    if not files:
+        raise MigrationError("No SQL migrations found")
+    sources = []
+    for version, file in enumerate(files, start=1):
+        match = re.fullmatch(r"(\d{4})_[a-z0-9_]+\.sql", file.name)
+        if match is None or int(match[1]) != version:
+            raise MigrationError("Migration numbers must be consecutive from 0001")
+        # Universal newline conversion keeps hashes stable across Windows/Linux.
+        script = file.read_text(encoding="utf-8")
+        sources.append((version, file.name, sha256(script.encode("utf-8")).hexdigest(), script))
+    return sources
+
+
+def check_migration_history(connection: sqlite3.Connection, sources: list) -> int:
+    """Read-only validation shared by startup and backup verification."""
+    applied = connection.execute(
+        "SELECT version, name, checksum FROM schema_migrations ORDER BY version"
+    ).fetchall()
+    if len(applied) > len(sources):
+        raise MigrationError("Database schema is newer than this backend")
+    for row, source in zip(applied, sources):
+        if tuple(row) != source[:3]:
+            raise MigrationError("Applied migration changed or history is inconsistent")
+    return len(applied)
 
 
 def statements(script: str) -> Iterator[str]:
@@ -60,38 +96,12 @@ class Database:
                 raise
 
     def initialize(self) -> None:
-        files = sorted(self.migrations.glob("*.sql"))
-        if not files:
-            raise MigrationError("No SQL migrations found")
-        sources = []
-        for version, file in enumerate(files, start=1):
-            match = re.fullmatch(r"(\d{4})_[a-z0-9_]+\.sql", file.name)
-            if match is None or int(match[1]) != version:
-                raise MigrationError("Migration numbers must be consecutive from 0001")
-            # Universal newline conversion keeps hashes stable across Windows/Linux.
-            script = file.read_text(encoding="utf-8")
-            sources.append((version, file.name, sha256(script.encode("utf-8")).hexdigest(), script))
-
+        sources = read_migrations(self.migrations)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self.transaction() as connection:
-            connection.execute("""
-                CREATE TABLE IF NOT EXISTS schema_migrations (
-                    version INTEGER PRIMARY KEY,
-                    name TEXT NOT NULL,
-                    checksum TEXT NOT NULL,
-                    applied_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
-                )
-            """)
-            applied = connection.execute(
-                "SELECT version, name, checksum FROM schema_migrations ORDER BY version"
-            ).fetchall()
-            if len(applied) > len(sources):
-                raise MigrationError("Database schema is newer than this backend")
-            for row, source in zip(applied, sources):
-                if tuple(row) != source[:3]:
-                    raise MigrationError("Applied migration changed or history is inconsistent")
-
-            for version, name, checksum, script in sources[len(applied):]:
+            connection.execute(MIGRATION_TABLE_SQL)
+            applied_count = check_migration_history(connection, sources)
+            for version, name, checksum, script in sources[applied_count:]:
                 for statement in statements(script):
                     connection.execute(statement)
                 connection.execute(
