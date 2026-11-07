@@ -10,6 +10,9 @@ from backend.app.database import Database, MIGRATIONS, MigrationError
 from backend.app.main import create_app
 
 
+MIGRATION_COUNT = len(list(MIGRATIONS.glob('*.sql')))
+
+
 @pytest.fixture
 def database(tmp_path):
     database = Database(tmp_path / 'данные' / 'smalltv.sqlite3')
@@ -36,7 +39,7 @@ def migration_copy(tmp_path):
 def test_initialize_creates_empty_registry_and_is_idempotent(database):
     database.initialize()
     with database.connection() as connection:
-        assert connection.execute('SELECT COUNT(*) FROM schema_migrations').fetchone()[0] == 1
+        assert connection.execute('SELECT COUNT(*) FROM schema_migrations').fetchone()[0] == MIGRATION_COUNT
         for table in ('users', 'devices', 'device_settings'):
             assert connection.execute(f'SELECT COUNT(*) FROM {table}').fetchone()[0] == 0
         assert connection.execute('PRAGMA integrity_check').fetchone()[0] == 'ok'
@@ -139,20 +142,20 @@ def test_pending_migration_failure_rolls_back_ddl_and_preserves_existing_data(da
     with database.transaction() as connection:
         seed(connection)
     migrations = migration_copy(tmp_path)
-    broken = migrations / '0002_extra.sql'
+    broken = migrations / f'{MIGRATION_COUNT + 1:04d}_extra.sql'
     broken.write_text('CREATE TABLE extra (id TEXT); INSERT INTO missing VALUES (1);', encoding='utf-8')
     with pytest.raises(sqlite3.OperationalError):
         Database(database.path, migrations).initialize()
     with database.connection() as connection:
         assert connection.execute("SELECT name FROM sqlite_master WHERE name = 'extra'").fetchone() is None
-        assert connection.execute('SELECT COUNT(*) FROM schema_migrations').fetchone()[0] == 1
+        assert connection.execute('SELECT COUNT(*) FROM schema_migrations').fetchone()[0] == MIGRATION_COUNT
         assert connection.execute('SELECT COUNT(*) FROM users').fetchone()[0] == 1
     broken.write_text('CREATE TABLE extra (id TEXT);', encoding='utf-8')
     upgraded = Database(database.path, migrations)
     upgraded.initialize()
     upgraded.initialize()
     with upgraded.connection() as connection:
-        assert connection.execute('SELECT COUNT(*) FROM schema_migrations').fetchone()[0] == 2
+        assert connection.execute('SELECT COUNT(*) FROM schema_migrations').fetchone()[0] == MIGRATION_COUNT + 1
 
 
 def test_changed_migration_is_rejected(database, tmp_path):
@@ -172,8 +175,8 @@ def test_migration_hash_survives_crlf_conversion(database, tmp_path):
 
 def test_newer_database_is_rejected(database):
     with database.transaction() as connection:
-        connection.execute('INSERT INTO schema_migrations (version, name, checksum) VALUES (2, ?, ?)',
-                           ('0002_future.sql', 'not-available'))
+        connection.execute('INSERT INTO schema_migrations (version, name, checksum) VALUES (?, ?, ?)',
+                           (MIGRATION_COUNT + 1, f'{MIGRATION_COUNT + 1:04d}_future.sql', 'not-available'))
     with pytest.raises(MigrationError, match='newer'):
         database.initialize()
 
@@ -201,7 +204,7 @@ def test_parallel_initialization_is_idempotent(tmp_path):
     with ThreadPoolExecutor(max_workers=2) as executor:
         list(executor.map(lambda _: Database(path).initialize(), range(2)))
     with Database(path).connection() as connection:
-        assert connection.execute('SELECT COUNT(*) FROM schema_migrations').fetchone()[0] == 1
+        assert connection.execute('SELECT COUNT(*) FROM schema_migrations').fetchone()[0] == MIGRATION_COUNT
 
 
 def test_startup_fails_for_unusable_database_path(tmp_path):

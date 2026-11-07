@@ -3,8 +3,9 @@
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, Response
-from fastapi.responses import RedirectResponse
+from fastapi import FastAPI, Request, Response
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.types import Scope
@@ -13,6 +14,8 @@ from typing import Literal
 
 from .config import Settings
 from .database import Database
+from .auth import router as auth_router
+from .devices import router as devices_router
 
 
 class Health(BaseModel):
@@ -41,6 +44,27 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(title="SmallTV Custom OS", version="0.1.0", lifespan=lifespan)
     app.state.settings = settings
     app.state.database = database
+
+    @app.middleware("http")
+    async def security_headers(request: Request, call_next):
+        response = await call_next(request)
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+        response.headers['X-Frame-Options'] = 'DENY'
+        response.headers['Referrer-Policy'] = 'same-origin'
+        if request.url.path.startswith('/api/'):
+            response.headers['Cache-Control'] = 'no-store'
+        return response
+
+    @app.exception_handler(RequestValidationError)
+    async def validation_error(request: Request, error: RequestValidationError):
+        # Default validation errors can echo request input, including passwords.
+        return JSONResponse(status_code=422, content={
+            "detail": [{"loc": item['loc'], "type": item['type'], "msg": item['msg']}
+                       for item in error.errors()]
+        })
+
+    app.include_router(auth_router)
+    app.include_router(devices_router)
 
     @app.get("/health", response_model=Health)
     def health(response: Response) -> Health:
