@@ -9,8 +9,8 @@ from backend.app.main import create_app
 
 
 @pytest.fixture
-def client():
-    with TestClient(create_app(Settings(_env_file=None))) as instance:
+def client(tmp_path):
+    with TestClient(create_app(Settings(_env_file=None, db_path=tmp_path / 'backend.sqlite3'))) as instance:
         yield instance
 
 
@@ -50,13 +50,16 @@ def test_environment_overrides(monkeypatch):
     monkeypatch.setenv('SMALLTV_HOST', '127.0.0.2')
     monkeypatch.setenv('SMALLTV_PORT', '8123')
     monkeypatch.setenv('SMALLTV_LOG_LEVEL', 'warning')
+    monkeypatch.setenv('SMALLTV_DB_PATH', 'tmp/custom.sqlite3')
     settings = Settings(_env_file=None)
     assert (settings.host, settings.port, settings.log_level) == ('127.0.0.2', 8123, 'warning')
+    assert settings.db_path.as_posix() == 'tmp/custom.sqlite3'
 
 
 @pytest.mark.parametrize('name,value', [
     ('SMALLTV_PORT', '0'), ('SMALLTV_PORT', '65536'), ('SMALLTV_PORT', 'bad'),
     ('SMALLTV_LOG_LEVEL', 'invalid'), ('SMALLTV_HOST', ''),
+    ('SMALLTV_DB_PATH', ''), ('SMALLTV_DB_PATH', ':memory:'),
 ])
 def test_invalid_environment_is_rejected(monkeypatch, name, value):
     monkeypatch.setenv(name, value)

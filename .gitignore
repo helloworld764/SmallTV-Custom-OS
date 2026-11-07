@@ -32,6 +32,7 @@ secrets.yml
 *.db
 *.db-*
 *.sqlite*
+data/
 backups/
 uploads/
 *.log

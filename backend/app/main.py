@@ -1,5 +1,6 @@
 """Liveness API and same-origin development simulator."""
 
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Response
@@ -7,9 +8,11 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.types import Scope
+from starlette.concurrency import run_in_threadpool
 from typing import Literal
 
 from .config import Settings
+from .database import Database
 
 
 class Health(BaseModel):
@@ -27,8 +30,17 @@ class SimulatorFiles(StaticFiles):
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
-    app = FastAPI(title="SmallTV Custom OS", version="0.1.0")
-    app.state.settings = settings if settings is not None else Settings()
+    settings = settings if settings is not None else Settings()
+    database = Database(settings.db_path)
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        await run_in_threadpool(database.initialize)
+        yield
+
+    app = FastAPI(title="SmallTV Custom OS", version="0.1.0", lifespan=lifespan)
+    app.state.settings = settings
+    app.state.database = database
 
     @app.get("/health", response_model=Health)
     def health(response: Response) -> Health:
