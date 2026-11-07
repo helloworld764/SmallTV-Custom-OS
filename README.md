@@ -21,7 +21,7 @@ backend/migrations/  нумерованные SQL-миграции
 firmware/         описание будущего аппаратного компонента, без прошивки
 web/simulator/   HTML/CSS/JS симулятор, без сборщика и npm-зависимостей
 web/panel/       локальная веб-панель: вход, устройства и настройки
-codex-monitor/   описание будущего Windows-агента, без реализации
+codex-monitor/   диагностика CLI и описание будущего Windows-агента
 docs/            архитектура и границы первого этапа
 tests/           Python API/config и JavaScript connection tests
 ```
@@ -160,6 +160,11 @@ API чтения устройств и изменения настроек тр�
 протокол; сам Monitor и источник реальных событий Codex ещё не реализованы.
 Пользовательские cookie, device-
 и agent-ключи не заменяют друг друга.
+
+Проверить доступность CLI в обычном Windows PowerShell можно без запуска заданий:
+`.\.venv\Scripts\python.exe codex-monitor/check_cli.py`. Утилита вызывает только
+`--version`/`exec --help` и выводит безопасный JSON-отчёт. Сам Windows Monitor пока
+не реализован. Исследование источника событий: [docs/codex-cli-research.md](docs/codex-cli-research.md).
 
 Повторный запуск сохраняет записи и не повторяет применённые миграции.
 База в `data/`, журналы SQLite, `.env` и тестовые файлы исключены из Git.

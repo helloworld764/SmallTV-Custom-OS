@@ -290,3 +290,29 @@ Heartbeat, состояние связи и последнее сообщённ�
 Debian и физическое устройство не менялись. Протокол не хранит тексты Codex;
 квоты не удаляют историю автоматически. Очередь доставки/TTL/оверлеи, Windows
 Monitor и источник настоящих событий остаются отдельными этапами.
+
+## Исследование источника Codex и безопасная диагностика CLI
+
+Изучены официальные страницы OpenAI non-interactive mode и hooks; ссылки,
+предварительное решение и ограничения зафиксированы в codex-cli-research.md.
+Добавлена только утилита `codex-monitor/check_cli.py`: PATH lookup, --version,
+exec --help, timeout, фильтр отчёта. Задания, модель, HTTP-транспорт и heartbeat
+она не запускает. Auth/config/transcript файлы агентом не читались и не менялись.
+
+- `.venv/Scripts/python.exe codex-monitor/check_cli.py`: ожидаемый для этой среды
+  результат **not_found**, код 1, cli_version=null, real_run_checked=false.
+  Это не тестовый сбой и не доказательство отсутствия CLI у владельца.
+- `.venv/Scripts/python.exe -m pytest -q --tb=short -p no:cacheprovider --basetemp=tmp/pytest-monitor-probe`:
+  **201 тест пройден**, без skipped, 77,07 с. Прежнее предупреждение
+  Starlette/TestClient об httpx осталось.
+- `node --test tests/panel.test.mjs tests/simulator.test.mjs tests/branding.test.mjs`:
+  **25 тестов пройдено**.
+- 16 новых тестов диагностики проверяют разрешённые аргументы без запуска задач,
+  отсутствие CLI, timeout/ошибки доступа/коды возврата, лишний вывод, распознавание
+  версии/флагов и отсутствие сырых данных/путей/ошибок в JSON-отчёте.
+
+Установленный у владельца CLI и реальный поток пока не проверены: команда не
+найдена в PATH среды агента, доступ к стандартному npm-пути ограничен. Версию
+нужно проверить в обычном Windows PowerShell. Полноценный Monitor не реализован;
+глобальные hooks не устанавливались. Backend, старые миграции, UI, TZ.md,
+AGENTS.md, пользовательские данные, Debian и устройство не менялись.
