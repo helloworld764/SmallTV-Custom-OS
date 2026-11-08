@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Storm OS — просмотр состояний питомцев</title>
+  <style>
+    :root { color-scheme: dark; font: 16px system-ui,sans-serif; background:#111218; color:#eef0f7; }
+    body { max-width:1200px; margin: auto; padding:24px; }
+    h1 { font-size:26px; } p { color:#b8becf; line-height:1.6; }
+    .toolbar { display:flex; gap:12px; flex-wrap:wrap; align-items:center; margin:24px 0; }
+    select,button { font:inherit; padding:10px; border:1px solid #596279; border-radius:8px; background:#252a38; color:inherit; }
+    button { cursor:pointer; } button:focus-visible,select:focus-visible { outline:3px solid #ff6278; }
+    .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:20px; }
+    article { background:#1b1e29; border:1px solid #424a60; border-radius:12px; padding:16px; }
+    h2 { margin:0 0 12px; } .pair { display:flex; gap:12px; flex-wrap:wrap; }
+    figure { margin:0; } figcaption { font-size:12px; margin-top:8px; color:#bbc3d5; }
+    .tile { background:var(--backdrop,#080809); width:96px; height:96px; outline:1px solid #667085; }
+    .tile img { width:96px; height:96px; object-fit:contain; image-rendering:pixelated; }
+    canvas { display:block; width:96px; height:96px; image-rendering:pixelated; }
+    details { margin-top:18px; } summary { cursor:pointer; } .sheet { max-width:100%; height:auto; background:var(--backdrop,#080809); margin-top:12px; }
+    small { display:block; margin-top:12px; color:#b8becf; line-height:1.5; }
+  </style>
+</head>
+<body>
+  <h1>Storm OS — состояния питомцев для просмотра</h1>
+  <p>Рабочие варианты по выбранным референсам. Слева — исходник, справа — выбранное состояние в 96×96.
+    Размер и границы кадров предварительные. Это локальный просмотр, ресурсы ещё не подключены к API/прошивке.</p>
+  <div class="toolbar">
+    <label>Состояние <select id="state">
+      <option>Нейтральное</option><option>Радость</option><option>Еда</option><option>Игра</option>
+      <option>Сон</option><option>Пробуждение</option><option>Голод / грусть</option><option>Усталость</option><option>Моргание / спокойный idle</option>
+    </select></label>
+    <button type="button" id="dark">Тёмный фон</button><button type="button" id="light">Светлый фон</button>
+  </div>
+  <main class="cards" id="cards"></main>
+  <p>Null — личный персонаж владельца. Его маска сохранена: девятый кадр — спокойный idle.
+    Для рабочей анимации ещё нужны согласование внешнего вида, точные рамки/якоря и проверка на SmallTV.</p>
+  <script>
+    const files = { Pixel:'Pixel-states-v2.png', Byte:'Byte-states-v1.png', Glitch:'Glitch-states-v1.png', Null:'Null-states-v2.png' };
+    const drafts = [];
+    const select = document.querySelector('#state');
+    function render() {
+      const index = select.selectedIndex;
+      for (const { image,canvas } of drafts) {
+        if (!image.naturalWidth) continue;
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0,0,96,96); ctx.imageSmoothingEnabled = false;
+        const w = image.naturalWidth/3, h = image.naturalHeight/3;
+        const scale = Math.min(96/w,96/h), dw=w*scale, dh=h*scale;
+        ctx.drawImage(image,(index%3)*w,Math.floor(index/3)*h,w,h,(96-dw)/2,(96-dh)/2,dw,dh);
+      }
+    }
+    for (const [name,file] of Object.entries(files)) {
+      const card=document.createElement('article');
+      // Only fixed project filenames/labels are used; no API or user input.
+      card.innerHTML=`<h2>${name}</h2><div class="pair"><figure><div class="tile"><img src="../references/${name}.png" alt="Исходник ${name}"></div><figcaption>Референс</figcaption></figure><figure><div class="tile"><canvas width="96" height="96" aria-label="Состояние ${name}"></canvas></div><figcaption>Рабочий вариант</figcaption></figure></div><details><summary>Все девять состояний</summary><img class="sheet" src="${file}" alt="Лист состояний ${name}"></details>`;
+      document.querySelector('#cards').append(card);
+      const image=new Image(); drafts.push({image,canvas:card.querySelector('canvas')});
+      image.onload=render; image.onerror=()=>{ const note=document.createElement('small');note.textContent='Не удалось открыть локальный PNG. Проверьте целостность папки assets/pets.';card.append(note); };
+      image.src=file;
+    }
+    select.addEventListener('change',render);
+    document.querySelector('#dark').onclick=()=>document.documentElement.style.setProperty('--backdrop','#080809');
+    document.querySelector('#light').onclick=()=>document.documentElement.style.setProperty('--backdrop','#f3f4f7');
+  </script>
+</body>
+</html>

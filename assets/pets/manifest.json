@@ -1,0 +1,153 @@
+{
+  "schema_version": 1,
+  "stage": "review_only",
+  "runtime_enabled": false,
+  "grid_is_layout_hint": true,
+  "states": [
+    "neutral",
+    "happy",
+    "eating",
+    "playing",
+    "sleeping",
+    "waking",
+    "hungry_sad",
+    "tired",
+    "blink"
+  ],
+  "characters": [
+    {
+      "id": "Pixel",
+      "access": "catalog",
+      "approval": "pending_visual_approval",
+      "reference": {
+        "file": "references/Pixel.png",
+        "width": 1254,
+        "height": 1254,
+        "sha256": "3cfc225f66e6d45cb5c48cf280255aecbe063ed6ae011db9f86895f172e899c0",
+        "alpha_min": 0,
+        "alpha_max": 255,
+        "fully_transparent_pixels": 1269656
+      },
+      "sheet": {
+        "file": "review/Pixel-states-v2.png",
+        "width": 1254,
+        "height": 1254,
+        "sha256": "5be0e3cfb331ea999393fbbccf785860cc8a7d4ccdd052b6f340ac374665f19e",
+        "alpha_min": 0,
+        "alpha_max": 255,
+        "fully_transparent_pixels": 861076
+      },
+      "columns": 3,
+      "rows": 3,
+      "state_overrides": {}
+    },
+    {
+      "id": "Byte",
+      "access": "catalog",
+      "approval": "pending_visual_approval",
+      "reference": {
+        "file": "references/Byte.png",
+        "width": 1254,
+        "height": 1254,
+        "sha256": "ebd74f5124fe998fcb13a3ea9860de896bcf163a3affbd932724da481728d05e",
+        "alpha_min": 0,
+        "alpha_max": 255,
+        "fully_transparent_pixels": 897667
+      },
+      "sheet": {
+        "file": "review/Byte-states-v1.png",
+        "width": 1261,
+        "height": 1247,
+        "sha256": "f282e8689b9bab2e385d3b963edfdc45af7abdd2eff6b1465078e767d53ea754",
+        "alpha_min": 0,
+        "alpha_max": 255,
+        "fully_transparent_pixels": 764609
+      },
+      "columns": 3,
+      "rows": 3,
+      "state_overrides": {}
+    },
+    {
+      "id": "Glitch",
+      "access": "catalog",
+      "approval": "pending_visual_approval",
+      "reference": {
+        "file": "references/Glitch.png",
+        "width": 1254,
+        "height": 1254,
+        "sha256": "86083739892e61596512eafc55723140913fe49ceb8bebf8c86995e1d1a1b25c",
+        "alpha_min": 0,
+        "alpha_max": 255,
+        "fully_transparent_pixels": 996042
+      },
+      "sheet": {
+        "file": "review/Glitch-states-v1.png",
+        "width": 1312,
+        "height": 1199,
+        "sha256": "ee6808207a3f90d7af245964b829d69212bd49f64ba073cca79b7646a3349066",
+        "alpha_min": 0,
+        "alpha_max": 255,
+        "fully_transparent_pixels": 851954
+      },
+      "columns": 3,
+      "rows": 3,
+      "state_overrides": {}
+    },
+    {
+      "id": "Null",
+      "access": "owner_only",
+      "approval": "pending_visual_approval",
+      "reference": {
+        "file": "references/Null.png",
+        "width": 1024,
+        "height": 1536,
+        "sha256": "781a3fdea48887326ccf74dc29697a88692b621f91ea4b6d412819b50747c9cd",
+        "alpha_min": 0,
+        "alpha_max": 255,
+        "fully_transparent_pixels": 965508
+      },
+      "sheet": {
+        "file": "review/Null-states-v2.png",
+        "width": 1024,
+        "height": 1536,
+        "sha256": "d446eb9e910d32447da0fa32652f6972a0258b21bcbec32e4330e58ef1dae931",
+        "alpha_min": 0,
+        "alpha_max": 254,
+        "fully_transparent_pixels": 991699
+      },
+      "columns": 3,
+      "rows": 3,
+      "state_overrides": {
+        "blink": "idle_mask_preserved"
+      }
+    }
+  ],
+  "superseded": [
+    {
+      "file": "review/Pixel-states-v1.png",
+      "width": 1254,
+      "height": 1254,
+      "sha256": "0463a717fd427d7d0d5d646c76fff117f26b631c454368b16b22c88d5c317344",
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "fully_transparent_pixels": 417602
+    },
+    {
+      "file": "review/Null-states-v1.png",
+      "width": 1024,
+      "height": 1536,
+      "sha256": "6ff2e2499f95a96805776dce53e25a24c718de83a1c9d8f2a02b3871c11a651e",
+      "alpha_min": 0,
+      "alpha_max": 254,
+      "fully_transparent_pixels": 978731
+    }
+  ],
+  "api_reactions": {
+    "ADOPT": "happy",
+    "FEED": "eating",
+    "PLAY": "playing",
+    "SLEEP": "sleeping",
+    "WAKE": "waking",
+    "RETURN": "happy"
+  }
+}

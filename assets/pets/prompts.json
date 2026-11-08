@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "tool": "built-in image_gen",
+  "transparent_background": true,
+  "review_only": true,
+  "prompts": [
+    {
+      "name": "Pixel-v1",
+      "reference_images": [
+        "references/Pixel.png"
+      ],
+      "output": "review/Pixel-states-v1.png",
+      "prompt": "Use case: identity-preserve.\nAsset type: transparent PNG game sprite reference sheet for Storm OS.\nImage 1 is the edit target and the exact approved design of Pixel. Create ONE clean 3-by-3 contact sheet of this SAME white pixel-art cat, nine full-body states, in equal square cells. Keep its original large head, body proportions, yellow eyes, orange/yellow inner ears, pink nose/cheeks, blue accents, tail, blocky pixel edges and exact palette. Preserve the approved character identity closely.\nCells in reading order:\n1 neutral (match original pose and face);\n2 happy, gentle joyful expression;\n3 eating, a small simple food bowl;\n4 playing, cheerful small paw gesture;\n5 sleeping peacefully, closed eyes;\n6 waking, a gentle stretch;\n7 hungry/sad, pleading eyes;\n8 tired, drooping eyes and relaxed posture;\n9 neutral blink, same pose as cell 1 with eyes briefly closed.\nKeep consistent visual size and a stable baseline within every equal cell; entire cat and tail fit in each cell with generous transparent margins and clear separation between cells. Simple consistent pixel-art shading as in the reference, no realistic rendering or new character redesign. No text, labels, numbers, grid lines, checkerboard pattern, scenery, watermark or opaque background. The entire background must be genuinely transparent. This is a review sheet, not a UI screenshot."
+    },
+    {
+      "name": "Byte",
+      "reference_images": [
+        "references/Byte.png"
+      ],
+      "output": "review/Byte-states-v1.png",
+      "prompt": "Use case: identity-preserve. Asset type: a single transparent PNG sprite review sheet for Storm OS. Input image 1 is the exact owner-approved character design, not a loose inspiration. Make a 3 by 3 sheet with nine full-body states of exactly this character, equal cells, consistent visual scale, generous clear transparent margins. Reading order: neutral, happy, eating, playing, sleeping, waking/stretching, hungry/sad, tired, neutral blink. Retain the reference silhouette, palette, proportions and signature details. Keep every figure inside its own cell. Crisp blocky pixel art, consistent pixels/shading, clean alpha edges. No text, labels, numbering, cell borders, opaque background, checkerboard drawing, grey halos, smoke, fuzzy glow, scattered raster noise or unrelated stickers. Only a small simple bowl is permitted for the eating state; no other new props. Actual transparent background. These are review states, not UI. Byte is the SAME bright green rounded slime with large dark eyes, small mouth and yellow-green highlight in the reference. Maintain its green colors and rounded stepped body, don't add legs, ears or hands. Change eye/mouth expression and gently squash/stretch for reactions; keep the same overall volume. Sleep and blink close its eyes. Reference's detached sparkles may be omitted for this clean character-only sheet."
+    },
+    {
+      "name": "Glitch",
+      "reference_images": [
+        "references/Glitch.png"
+      ],
+      "output": "review/Glitch-states-v1.png",
+      "prompt": "Use case: identity-preserve. Asset type: a single transparent PNG sprite review sheet for Storm OS. Input image 1 is the exact owner-approved character design, not a loose inspiration. Make a 3 by 3 sheet with nine full-body states of exactly this character, equal cells, consistent visual scale, generous clear transparent margins. Reading order: neutral, happy, eating, playing, sleeping, waking/stretching, hungry/sad, tired, neutral blink. Retain the reference silhouette, palette, proportions and signature details. Keep every figure inside its own cell. Crisp blocky pixel art, consistent pixels/shading, clean alpha edges. No text, labels, numbering, cell borders, opaque background, checkerboard drawing, grey halos, smoke, fuzzy glow, scattered raster noise or unrelated stickers. Only a small simple bowl is permitted for the eating state; no other new props. Actual transparent background. These are review states, not UI. Glitch is the SAME lavender pixel ghost with brown-dark outline and face, scalloped bottom and purple accents. Preserve its exact ghost identity and palette. Reactions use subtle eyes/mouth and little ghost arms/body movement. Do not turn it into a cat or slime. Reference's floating particles and bottom purple halo may be omitted from this clean character-only sheet; no new floating objects."
+    },
+    {
+      "name": "Null",
+      "reference_images": [
+        "references/Null.png"
+      ],
+      "output": "review/Null-states-v1.png",
+      "prompt": "Use case: identity-preserve. Asset type: a single transparent PNG sprite review sheet for Storm OS. Input image 1 is the exact owner-approved character design, not a loose inspiration. Make a 3 by 3 sheet with nine full-body states of exactly this character, equal cells, consistent visual scale, generous clear transparent margins. Reading order: neutral, happy, eating, playing, sleeping, waking/stretching, hungry/sad, tired, neutral blink. Retain the reference silhouette, palette, proportions and signature details. Keep every figure inside its own cell. Crisp blocky pixel art, consistent pixels/shading, clean alpha edges. No text, labels, numbering, cell borders, opaque background, checkerboard drawing, grey halos, smoke, fuzzy glow, scattered raster noise or unrelated stickers. Only a small simple bowl is permitted for the eating state; no other new props. Actual transparent background. These are review states, not UI. Null is the SAME full-body hooded masked pixel figure. Preserve the white stylized mask's recognizable geometry, black clothing, red hood edge and drawstrings, and especially the EXACT red swirl emblem on the chest from the reference. Never change the emblem into a letter, heart or different logo. Mask identity stays fixed; emotions are conveyed through gentle head tilts, hands and posture, not a replacement face. Neutral and blink remain close to the source stance; happy uses a small friendly hand gesture, eating holds a small bowl without removing the mask, playing is a subtle playful gesture, sleeping slumps peacefully, waking stretches arms, sad lowers head, tired relaxes shoulders. Maintain full body and consistent height/width across all nine cells. Do not add weapons, screens, computers, symbols, icons or text."
+    },
+    {
+      "name": "Pixel-clean",
+      "reference_images": [
+        "review/Pixel-states-v1.png",
+        "references/Pixel.png"
+      ],
+      "output": "review/Pixel-states-v2.png",
+      "prompt": "Use case: precise-object-edit. Image 1 is the edit target, a 3x3 Pixel cat sprite sheet; image 2 is the approved original cat for identity. Change ONLY cleanliness of the background and unwanted decorations: remove every gray fuzzy patch, stray pixel cloud, colored sticker, sparkle, colored ring and sleep symbol outside the cats. Keep exactly the same nine cats, expressions, poses, order, proportions, white/orange/pink/blue palette and 3x3 placement. Keep the simple food bowl in the eating cell. Preserve crisp pixel-art outlines and make all remaining background fully transparent, with clean alpha edges and no halos/checkerboard/scenery/text. Do not redesign the cats, add props, or change the sheet layout."
+    },
+    {
+      "name": "Null-clean",
+      "reference_images": [
+        "review/Null-states-v1.png"
+      ],
+      "output": "review/Null-states-v2.png",
+      "prompt": "Use case: background-extraction and precise-object-edit. Image 1 is the edit target: a nine-state 3x3 contact sheet of Null. Keep ALL nine existing figures exactly where they are, with the same poses, masks, black clothes, skin tones, red hood trim and exact red swirl chest emblems. Change ONLY the background: remove all gray/brown/red hazy backdrop, glows, shadows outside the figures and faint colored clouds between cells. Every empty region and gutter must be completely transparent alpha zero; preserve the dark pixels inside each figure and preserve the small food bowl. Sharp clean pixel-art silhouette edges, no semi-transparent background veil, no new icons, no text, no new characters, no redesign, no rearrangement. The result is the same review sheet on a truly clear transparent canvas."
+    }
+  ]
+}
