@@ -97,6 +97,7 @@ function drawCurrentPet() {
 function renderPreview() {
   const settings = preview.settings;
   document.querySelector('.display').dataset.theme = preview.theme;
+  document.querySelector('.display').dataset.screen = settings.start_screen;
   document.querySelector('#screen-content').style.opacity = preview.canDisplaySettings ? settings.brightness / 100 : 0;
   const clock = settings.start_screen === 'clock';
   document.querySelector('#clock-content').hidden = !clock;

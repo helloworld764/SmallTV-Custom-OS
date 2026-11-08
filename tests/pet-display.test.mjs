@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 import { drawPetFrame, PET_SHEETS, petPresentation } from '../web/simulator/pet-display.mjs';
 
@@ -16,6 +17,14 @@ test('only the three approved catalogue sprites are configured for public previe
     assert.equal(sheet.rows, 3);
     assert.match(sheet.src, /^\.\/pets\/(Pixel|Byte|Glitch)-states\.png$/);
   }
+});
+
+test('Tamagotchi uses most of the 240 by 240 display area', () => {
+  const html = readFileSync(new URL('../web/simulator/index.html', import.meta.url), 'utf8');
+  const css = readFileSync(new URL('../web/simulator/style.css', import.meta.url), 'utf8');
+  assert.match(html, /id="pet-art" width="208" height="146"/);
+  assert.match(css, /data-screen=tamagotchi\] #screen-content \{ height: 174px; margin-top: 4px;/);
+  assert.match(css, /#pet-art \{[^}]*width: 208px; height: 146px;/);
 });
 
 test('accepted pet actions select their corresponding short-lived reaction frames', () => {
