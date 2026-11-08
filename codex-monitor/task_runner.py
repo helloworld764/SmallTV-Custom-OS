@@ -51,7 +51,13 @@ def exclusive_outbox(path):
 def display_answer(text):
     # Do not allow terminal escape sequences or C1 controls from model output.
     safe = ''.join(c for c in text if c in '\n\t' or (ord(c) >= 32 and not 127 <= ord(c) <= 159))
-    print('--- Codex answer ---\n' + safe + '\n--- End answer ---', flush=True)
+    output = '--- Codex answer ---\n' + safe + '\n--- End answer ---'
+    encoding = getattr(sys.stdout, 'encoding', None)
+    if encoding:
+        # Redirected Windows stdout can use a legacy code page. Preserve readable
+        # text and escape unsupported characters without altering console state.
+        output = output.encode(encoding, errors='backslashreplace').decode(encoding)
+    print(output, flush=True)
 
 
 def run_task(prompt, cwd, *, timeout=1800, event_sink=None, tick=None, show_answer=False):

@@ -71,7 +71,8 @@ def observe(command, cwd, timeout=120, *, event_sink=None, tick=None, input_text
     report = {'status': 'failed_start', 'real_run_checked': False, 'exit_code': None,
               'parser_outcome': 'UNKNOWN', 'parser_reason': None, 'answer_matches': False,
               'event_counts': dict.fromkeys(KNOWN_TYPES, 0), 'unknown_event_count': 0,
-              'stderr_present': False, 'argument_hint': None}
+              'stderr_present': False, 'argument_hint': None,
+              'stdout_bytes': 0, 'max_line_chars': 0, 'limit_scope': None}
     if not require_answer:
         report['answer_matches'] = None
     answer = None
@@ -152,6 +153,7 @@ def observe(command, cwd, timeout=120, *, event_sink=None, tick=None, input_text
         nonlocal answer
         try:
             line = raw.decode('utf-8')
+            report['max_line_chars'] = max(report['max_line_chars'], len(line))
             events = parser.feed(line)
             message = json.loads(line) if line.strip() else {}
         except (UnicodeError, ValueError, RecursionError):
@@ -190,6 +192,7 @@ def observe(command, cwd, timeout=120, *, event_sink=None, tick=None, input_text
                 break
             if excessive.is_set():
                 report['status'] = 'output_limit'
+                report['limit_scope'] = 'stderr'
                 break
             if time.monotonic() >= deadline:
                 report['status'] = 'timeout'
@@ -199,23 +202,30 @@ def observe(command, cwd, timeout=120, *, event_sink=None, tick=None, input_text
             except queue.Empty:
                 continue
             size += len(chunk)
+            report['stdout_bytes'] = size
             if size > MAX_STREAM_BYTES:
                 report['status'] = 'output_limit'
+                report['limit_scope'] = 'stdout'
                 break
             pending += chunk
             if len(pending) > MAX_LINE_CHARS * 4 and b'\n' not in pending:
                 report['status'] = 'output_limit'
+                report['limit_scope'] = 'event'
                 break
             while b'\n' in pending:
                 raw, pending = pending.split(b'\n', 1)
                 if not consume(raw):
                     report['status'] = 'output_limit' if parser.reason == 'line_limit' else 'parser_rejected'
+                    if parser.reason == 'line_limit':
+                        report['limit_scope'] = 'event'
                     break
             else:
                 if chunk:
                     continue
                 if pending and not consume(pending):
                     report['status'] = 'output_limit' if parser.reason == 'line_limit' else 'parser_rejected'
+                    if parser.reason == 'line_limit':
+                        report['limit_scope'] = 'event'
                     break
                 process.wait(timeout=max(0.01, deadline - time.monotonic()))
                 if writer is not None:
@@ -263,6 +273,8 @@ def observe(command, cwd, timeout=120, *, event_sink=None, tick=None, input_text
             process.stderr.close()
         if report['status'] == 'verified' and (excessive.is_set() or reader_error.is_set()):
             report['status'] = 'output_limit' if excessive.is_set() else 'stream_read_failed'
+            if excessive.is_set():
+                report['limit_scope'] = 'stderr'
     if report['status'] == 'cancelled' and process.returncode is not None:
         try:
             emit(parser.finish(process.returncode, cancelled_by_user=True))

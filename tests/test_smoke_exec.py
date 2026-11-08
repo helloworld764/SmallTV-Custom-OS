@@ -60,15 +60,15 @@ def test_output_limit_stops_fixture_without_printing_it(smoke, tmp_path, monkeyp
     assert result['status'] == 'output_limit' and 'private' not in json.dumps(result)
 
 
-@pytest.mark.parametrize('character', ['x', '\u044f'])
-def test_large_command_output_event_can_complete_without_leaking_contents(smoke, tmp_path, character):
+@pytest.mark.parametrize('character,count', [('x', 90000), ('\u044f', 90000), ('x', 400000)])
+def test_large_command_output_event_can_complete_without_leaking_contents(smoke, tmp_path, character, count):
     # Generate in the child: Windows cannot accept a 90K command-line argument.
     code = (
         'import json; '
         'print(json.dumps({"type":"turn.started"})); '
         'print(json.dumps({"type":"item.completed","item":{"id":"read",'
         '"type":"command_execution","aggregated_output":'
-        f'"private-marker"+{ascii(character)}*90000' '}} , ensure_ascii=False)); '
+        f'"private-marker"+{ascii(character)}*{count}' '}} , ensure_ascii=False)); '
         'print(json.dumps({"type":"turn.completed","usage":'
         '{"input_tokens":1,"cached_input_tokens":0,"output_tokens":1}}))'
     )
@@ -78,12 +78,16 @@ def test_large_command_output_event_can_complete_without_leaking_contents(smoke,
     result = smoke.observe(command, tmp_path, timeout=5, require_answer=False, event_sink=events.append)
     assert result['status'] == 'verified' and result['parser_outcome'] == 'DONE'
     assert result['event_counts']['item.completed'] == 1
+    assert result['max_line_chars'] > count and result['stdout_bytes'] > count
+    assert result['limit_scope'] is None
     assert [event['kind'] for event in events] == ['START', 'DONE']
     assert 'private-marker' not in json.dumps(result) + json.dumps(events)
 
 
 @pytest.mark.parametrize('trailing_newline', [True, False])
-def test_oversized_valid_event_has_explicit_limit_and_no_done(smoke, tmp_path, trailing_newline):
+def test_oversized_valid_event_has_explicit_limit_and_no_done(smoke, tmp_path, trailing_newline, monkeypatch):
+    # Isolate the parser's character guard from the production total byte cap.
+    monkeypatch.setattr(smoke, 'MAX_STREAM_BYTES', smoke.MAX_LINE_CHARS * 2)
     code = (
         'import json; print(json.dumps({"type":"turn.started"})); '
         'print(json.dumps({"type":"item.completed","item":{"id":"read",'
@@ -94,6 +98,7 @@ def test_oversized_valid_event_has_explicit_limit_and_no_done(smoke, tmp_path, t
     result = smoke.observe([sys.executable, '-c', code], tmp_path, timeout=5,
                            require_answer=False, event_sink=events.append)
     assert result['status'] == 'output_limit' and result['parser_reason'] == 'line_limit'
+    assert result['limit_scope'] == 'event'
     assert result['parser_outcome'] == 'UNKNOWN'
     assert [event['kind'] for event in events] == ['START']
     assert 'private-marker' not in json.dumps(result) + json.dumps(events)
@@ -110,6 +115,7 @@ def test_total_stream_limit_still_applies_to_individually_valid_events(smoke, tm
     result = smoke.observe([sys.executable, '-c', code], tmp_path, timeout=5,
                            require_answer=False, event_sink=events.append)
     assert result['status'] == 'output_limit' and result['parser_outcome'] == 'UNKNOWN'
+    assert result['limit_scope'] == 'stdout' and result['stdout_bytes'] > smoke.MAX_STREAM_BYTES
     assert [event['kind'] for event in events] == ['START']
 
 

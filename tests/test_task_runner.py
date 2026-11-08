@@ -152,6 +152,20 @@ def test_opt_in_answer_strips_terminal_controls(task, capsys):
     assert '\x1b' not in output and '\x9d' not in output and 'hello' in output
 
 
+def test_answer_on_legacy_windows_stdout_escapes_unsupported_unicode(task, monkeypatch):
+    import io
+    from types import SimpleNamespace
+    raw = io.BytesIO()
+    stream = io.TextIOWrapper(raw, encoding='cp1251', errors='strict')
+    monkeypatch.setattr(task, 'sys', SimpleNamespace(stdout=stream))
+    monkeypatch.setattr(sys, 'stdout', stream)
+    task.display_answer('\u041f\u0440\u0438\u0432\u0435\u0442 \u2705 \U0001f30a')
+    output = raw.getvalue().decode('cp1251')
+    assert '\u041f\u0440\u0438\u0432\u0435\u0442' in output
+    assert r'\u2705' in output and r'\U0001f30a' in output
+    assert '--- End answer ---' in output
+
+
 def test_answer_sink_is_only_called_after_verified_completion(task, tmp_path):
     import smoke_exec
     answers = []

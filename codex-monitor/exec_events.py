@@ -8,7 +8,7 @@ from uuid import uuid4
 
 # Command output is embedded in one JSONL event, including multi-file reads.
 # The process observer separately caps the entire byte stream at 1 MiB.
-MAX_LINE_CHARS = 262144
+MAX_LINE_CHARS = 1048576
 
 
 @dataclass(frozen=True)
