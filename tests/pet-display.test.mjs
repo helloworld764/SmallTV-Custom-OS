@@ -64,7 +64,13 @@ test('draw uses source cells from the approved 3 by 3 sheet without changing the
   assert.equal(drawPetFrame(context, image, 'Pixel', 'playing', 120, 80), true);
   assert.equal(context.imageSmoothingEnabled, false);
   assert.deepEqual(calls[0], ['clearRect', 0, 0, 120, 80]);
-  assert.deepEqual(calls[1], ['drawImage', image, 0, 200, 300, 200, 0, 0, 120, 80]);
+  const [, , sx, sy, sw, sh, dx, dy, dw, dh] = calls[1];
+  assert.ok(sx >= 0 && sy >= 200 && sy < 400);
+  assert.ok(sw > 0 && sh > 0 && sw <= 300 && sh <= 200);
+  assert.ok(Math.abs(dw / sw - dh / sh) < 1e-9, 'one proportional scale');
+  assert.ok(Math.abs(dx * 2 + dw - 120) < 1e-9, 'centered horizontally');
+  assert.ok(Math.abs(dy * 2 + dh - 80) < 1e-9, 'centered vertically');
+  assert.ok(Math.abs(dw - 116) < 1e-9 || Math.abs(dh - 76) < 1e-9, 'fills area with a two-pixel safety gap');
   assert.equal(drawPetFrame(context, image, 'Null', 'neutral', 120, 80), false);
   assert.equal(drawPetFrame(context, image, 'Pixel', 'unknown-state', 120, 80), true);
   assert.equal(drawPetFrame(context, null, 'Pixel', 'neutral', 120, 80), false);

@@ -58,3 +58,5 @@ manifest. Его оригинал и листы доступны только л
 сверяет опубликованные PNG побайтно с одобренными листами, проверяет хеши,
 размеры, HTTP MIME и 404 для Null/private assets. Настоящий браузер и устройство
 не считаются проверенными этими тестами.
+
+Visible alpha bounds are fitted proportionally into the 240x180 canvas with a two-pixel safety gap. Transparent frame margins are excluded using pet-frame-bounds.mjs; the original PNG assets remain unchanged.

@@ -1,3 +1,5 @@
+import { PET_FRAME_BOUNDS } from './pet-frame-bounds.mjs';
+
 // Draws approved public pet state sheets in the simulator. The sheets remain
 // untouched; frame boundaries are an even 3x3 preview grid, not firmware data.
 export const PET_SHEETS = Object.freeze({
@@ -47,11 +49,13 @@ export function drawPetFrame(context, image, character, state, width, height) {
       || !Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return false;
   const stateIndex = PET_STATES.indexOf(state);
   const index = stateIndex < 0 ? 0 : stateIndex;
-  const sourceWidth = image.naturalWidth / sheet.columns;
-  const sourceHeight = image.naturalHeight / sheet.rows;
-  const sourceX = (index % sheet.columns) * sourceWidth;
-  const sourceY = Math.floor(index / sheet.columns) * sourceHeight;
-  const scale = Math.min(width / sourceWidth, height / sourceHeight);
+  // Crop only transparent padding, then use one scale for both dimensions.
+  const bounds = PET_FRAME_BOUNDS[character][index];
+  const sourceX = bounds[0] * image.naturalWidth;
+  const sourceY = bounds[1] * image.naturalHeight;
+  const sourceWidth = bounds[2] * image.naturalWidth;
+  const sourceHeight = bounds[3] * image.naturalHeight;
+  const scale = Math.min(Math.max(1, width - 4) / sourceWidth, Math.max(1, height - 4) / sourceHeight);
   const drawWidth = sourceWidth * scale;
   const drawHeight = sourceHeight * scale;
   context.clearRect(0, 0, width, height);
