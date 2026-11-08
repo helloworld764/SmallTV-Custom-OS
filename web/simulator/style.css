@@ -22,5 +22,6 @@ header { font-size: 12px; letter-spacing: 2px; color: var(--screen-accent); disp
 #status { font-size: 11px; color: var(--screen-text); text-align: center; margin-top: 6px; }
 footer { position: absolute; bottom: 12px; font-size: 9px; letter-spacing: 1px; color: #9999a4; }
 #notice { position: absolute; inset: 54px 8px 44px; background: var(--screen-bg); border: 1px solid var(--screen-accent); padding: 28px 8px; box-sizing: border-box; text-align: center; font-size: 17px; }
+#notice { white-space: pre-line; font-size: 15px; }
 details { max-width: 500px; }
 summary { cursor: pointer; }

@@ -7,6 +7,36 @@
 Постоянного наблюдения за всеми сессиями, Debian-приёмки и аппаратной проверки нет.
 Актуальные границы: [architecture.md](architecture.md), [task-runner.md](task-runner.md).
 
+## 8 ноября 2026 — документация, device heartbeat и уведомления симулятора
+
+Три последовательных локальных этапа без Debian и физического SmallTV:
+
+1. Сверены текущие описания Monitor/CLI с исходниками; история прошлых проверок
+   сохранена. `python -m pytest -q`: 326 passed; JavaScript: 25 passed.
+2. Device heartbeat и migration 0007: отдельные credentials, серверная свежесть,
+   гонки/лимиты, рестарт и восстановление старой копии. 349 Python passed,
+   25 JavaScript passed. Есть настоящий изолированный loopback HTTP-тест.
+3. Проекция конечных событий Codex в авторизованное превью: TTL, курсор,
+   приоритеты, дедупликация и ограниченный буфер. Итог: 364 Python passed,
+   33 JavaScript passed. Команды из корня:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest -q
+node --test tests/simulator.test.mjs tests/panel.test.mjs tests/branding.test.mjs
+node --check web/simulator/simulator.mjs
+node --check web/simulator/notifications.mjs
+```
+
+Пропусков/ошибок нет. Сохранилось предупреждение Starlette о deprecated httpx
+testclient. Расширенный HTTP-тест выполняет отправку START/DONE, чтение из SQLite
+JavaScript-клиентом и работу модели оверлея; потеря сессии/чужое устройство также
+проверяются. Это не визуальная браузерная приёмка и не физическая доставка.
+Тесты используют временные БД/ключи/порты, не рабочую БД или реальные credentials.
+Старые SQL-миграции, TZ.md и AGENTS.md не изменены; новых зависимостей нет.
+
+Функции Tamagotchi, Storm Bot и расширения панели пока только предложены:
+[functions-for-approval.md](functions-for-approval.md); реализации до согласования нет.
+
 Дата: 7 ноября 2026 г. Среда проверки: Windows, встроенный Python 3.12.14,
 Node.js 24.12.0, Git 2.53.0.
 

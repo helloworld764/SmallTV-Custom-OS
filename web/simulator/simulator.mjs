@@ -1,10 +1,12 @@
 import { Connection, checkHealth } from './connection.mjs';
 import { ApiClient } from '../panel/api.mjs';
 import { PreviewSettings, THEMES } from './preview.mjs';
+import { Notifications, readNotifications } from './notifications.mjs';
 
 const connection = new Connection();
 const deviceId = new URLSearchParams(window.location.search).get('device');
 const preview = new PreviewSettings(deviceId);
+const notifications = new Notifications(deviceId);
 const api = new ApiClient({ timeout: 2500 });
 const indicator = document.querySelector('#indicator');
 const status = document.querySelector('#status');
@@ -14,7 +16,7 @@ const labels = {
   unknown: 'Проверка связи…', online: 'Backend доступен',
   stale: 'Данные устарели · проверяем', offline: 'Связь с backend потеряна',
 };
-let noticeTimer;
+const eventStatus = document.querySelector('#event-status');
 
 function renderPreview() {
   const settings = preview.settings;
@@ -59,17 +61,33 @@ async function poll() {
   }
   const message = connection.record(ok, Date.now());
   if (message) {
-    clearTimeout(noticeTimer);
-    notice.textContent = message;
-    notice.hidden = false;
-    noticeTimer = setTimeout(() => { notice.hidden = true; }, 4000);
+    notifications.local(message, connection.state === 'offline', performance.now());
   }
   render();
   if (deviceId) {
     if (ok) {
-      try { preview.apply(await api.settings(deviceId), Date.now()); }
-      catch (error) { preview.fail(error.status); }
-    } else preview.fail();
+      try {
+        preview.apply(await api.settings(deviceId), Date.now());
+        const startedAt = performance.now();
+        const page = await readNotifications(api, deviceId, notifications.cursor);
+        notifications.apply(page, performance.now(), startedAt);
+        eventStatus.textContent = 'Уведомления Codex подключены. DONE означает завершение ответа, а не проверку результата.';
+      } catch (error) {
+        if ([401, 403, 404].includes(error.status)) {
+          preview.fail(error.status);
+          notifications.reset();
+          notice.hidden = true;
+          notice.textContent = '';
+          eventStatus.textContent = 'Для уведомлений нужен доступ к выбранному устройству.';
+        } else {
+          preview.fail();
+          eventStatus.textContent = 'Уведомления временно недоступны; повторим проверку.';
+        }
+      }
+    } else {
+      preview.fail();
+      eventStatus.textContent = 'Уведомления временно недоступны; повторим проверку.';
+    }
     renderPreview();
   }
   // Schedule only after completion: requests cannot overlap.
@@ -83,6 +101,9 @@ function tick() {
     weekday: 'short', day: 'numeric', month: 'long',
   });
   connection.age(now.getTime());
+  const message = notifications.tick(performance.now());
+  notice.textContent = message ?? '';
+  notice.hidden = message === null;
   render();
 }
 

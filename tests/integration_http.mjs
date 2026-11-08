@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 import { ApiClient, ApiError } from '../web/panel/api.mjs';
 import { PreviewSettings } from '../web/simulator/preview.mjs';
 import { checkHealth } from '../web/simulator/connection.mjs';
+import { Notifications, readNotifications } from '../web/simulator/notifications.mjs';
 
 const { base, password } = JSON.parse(readFileSync(0, 'utf8'));
 const cookies = new Map();
@@ -75,6 +76,13 @@ assert.equal((await client.request(runPath)).last_reported_state, 'WORKING');
 await assert.rejects(report({ ...softwareStart, kind: 'DONE' }), error => error.status === 409);
 const softwareDone = { ...softwareStart, event_id: randomUUID(), sequence: 2, kind: 'DONE' };
 await report(softwareDone);
+const inbox = new Notifications('integration-tv');
+inbox.apply(await readNotifications(client, 'integration-tv', 0), 0);
+assert.match(inbox.tick(0), /ответ завершён/);
+assert.deepEqual((await readNotifications(client, 'integration-tv', inbox.cursor)).events, []);
+assert.equal(inbox.tick(4000), null);
+assert.equal(preview.settings.start_screen, 'weather');
+await assert.rejects(readNotifications(client, 'foreign-tv', 0), error => error.status === 404);
 assert.equal((await client.request(runPath)).last_reported_state, 'DONE');
 assert.equal((await client.request(`${runPath}/events?after_sequence=1`)).length, 1);
 await client.request('/api/v1/agents/codex/heartbeat', { method: 'POST', body: {}, headers: agentAuth });
@@ -98,10 +106,12 @@ assert.equal((await client.request(runPath)).last_reported_state, 'DONE');
 await assert.rejects(client.request('/api/v1/agents/codex/heartbeat', {
   method: 'POST', body: {}, headers: agentAuth,
 }), error => error.status === 401);
-for (const path of ['/panel/', '/simulator/?device=integration-tv', '/simulator/preview.mjs']) {
+for (const path of ['/panel/', '/simulator/?device=integration-tv', '/simulator/preview.mjs', '/simulator/notifications.mjs']) {
   assert.equal((await fetcher(path)).status, 200);
 }
 await client.logout(session.csrf_token);
+await assert.rejects(readNotifications(client, 'integration-tv', inbox.cursor), error => error.status === 401);
+inbox.reset();
 try { await client.settings('integration-tv'); assert.fail('Session should be revoked'); }
 catch (error) { assert.equal(error.status, 401); preview.fail(error.status); }
 assert.equal(preview.state, 'signed-out');

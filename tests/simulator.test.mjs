@@ -2,6 +2,114 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Connection, checkHealth } from '../web/simulator/connection.mjs';
 import { PreviewSettings } from '../web/simulator/preview.mjs';
+import { Notifications, readNotifications } from '../web/simulator/notifications.mjs';
+
+function notificationPage(events = [{ id: 'event-one', cursor: 1, kind: 'DONE', ttl_seconds: 60 }]) {
+  return { device_id: 'device-one', server_time: 1000, next_cursor: events.at(-1)?.cursor ?? 0, events };
+}
+
+test('Codex notification replay does not duplicate or extend a completed overlay', () => {
+  const inbox = new Notifications('device-one');
+  inbox.apply(notificationPage(), 0);
+  assert.match(inbox.tick(0), /ответ завершён/);
+  inbox.apply(notificationPage(), 3000);
+  assert.match(inbox.tick(3000), /Результат требует проверки/);
+  assert.equal(inbox.tick(4000), null);
+  assert.equal(inbox.queue.length, 0);
+  assert.equal(inbox.cursor, 1);
+});
+
+test('errors have priority and overlays never change the underlying preview screen', () => {
+  const inbox = new Notifications('device-one');
+  const preview = new PreviewSettings('device-one');
+  preview.apply({ device_id: 'device-one', theme: 'Dark Blue', brightness: 17, start_screen: 'weather' }, 0);
+  const before = structuredClone(preview.settings);
+  inbox.apply(notificationPage([
+    { id: 'done', cursor: 1, kind: 'DONE', ttl_seconds: 60 },
+    { id: 'error', cursor: 2, kind: 'ERROR', ttl_seconds: 60 },
+  ]), 0);
+  assert.match(inbox.tick(0), /ошибка/);
+  assert.match(inbox.tick(4000), /ответ завершён/);
+  assert.equal(inbox.tick(8000), null);
+  assert.deepEqual(preview.settings, before);
+});
+
+test('connection outage preempts a Codex overlay then resumes only its remaining duration', () => {
+  const inbox = new Notifications('device-one');
+  inbox.apply(notificationPage(), 0);
+  inbox.tick(0);
+  inbox.local('Связь потеряна', true, 1000);
+  assert.equal(inbox.tick(1000), 'Связь потеряна');
+  assert.match(inbox.tick(5000), /ответ завершён/);
+  assert.equal(inbox.tick(8000), null);
+});
+
+test('TTL expires during display and network delay cannot extend notification lifetime', () => {
+  const page = notificationPage([{ id: 'short', cursor: 1, kind: 'ERROR', ttl_seconds: 1 }]);
+  const inbox = new Notifications('device-one');
+  inbox.apply(page, 0);
+  assert.match(inbox.tick(0), /ошибка/);
+  assert.equal(inbox.tick(1000), null);
+  inbox.reset();
+  inbox.apply(page, 2000, 0);
+  assert.equal(inbox.tick(2000), null);
+  assert.equal(inbox.cursor, 1);
+});
+
+test('invalid and wrong-device responses cannot partially enqueue or advance cursor', () => {
+  const invalid = [
+    { ...notificationPage(), device_id: 'foreign' },
+    { ...notificationPage(), next_cursor: Number.MAX_SAFE_INTEGER + 1 },
+    { ...notificationPage(), events: null },
+    notificationPage([{ id: 'bad', cursor: 1, kind: 'START', ttl_seconds: 60 }]),
+    notificationPage([{ id: 'bad', cursor: 1, kind: 'DONE', ttl_seconds: 61 }]),
+    notificationPage([{ id: 'same', cursor: 1, kind: 'DONE', ttl_seconds: 60 },
+                      { id: 'same', cursor: 2, kind: 'ERROR', ttl_seconds: 60 }]),
+    notificationPage([{ id: 'one', cursor: 2, kind: 'DONE', ttl_seconds: 60 },
+                      { id: 'two', cursor: 1, kind: 'ERROR', ttl_seconds: 60 }]),
+  ];
+  for (const page of invalid) {
+    const inbox = new Notifications('device-one');
+    assert.throws(() => inbox.apply(page, 0));
+    assert.equal(inbox.cursor, 0);
+    assert.equal(inbox.tick(0), null);
+  }
+});
+
+test('notification buffers are bounded and highest priority survives overflow', () => {
+  const inbox = new Notifications('device-one');
+  for (let page = 0; page < 8; page++) {
+    inbox.apply(notificationPage(Array.from({ length: 20 }, (_, i) => ({
+      id: `event-${page * 20 + i}`, cursor: page * 20 + i + 1,
+      kind: i === 19 ? 'ERROR' : 'DONE', ttl_seconds: 60,
+    }))), 0);
+  }
+  assert.equal(inbox.queue.length, 8);
+  assert.equal(inbox.seen.size, 128);
+  assert.match(inbox.tick(0), /ошибка/);
+  assert.equal(inbox.tick(61000), null);
+});
+
+test('session denial reset clears private overlays and permits a fresh cursor after DB restore', () => {
+  const inbox = new Notifications('device-one');
+  inbox.apply(notificationPage(), 0);
+  inbox.tick(0);
+  inbox.apply({ ...notificationPage([]), next_cursor: 0 }, 1000);
+  assert.equal(inbox.cursor, 0); // Rewind does not erase deduplication of live IDs.
+  inbox.apply(notificationPage(), 1000);
+  assert.equal(inbox.queue.length, 0);
+  inbox.reset();
+  assert.equal(inbox.tick(1000), null);
+  assert.equal(inbox.cursor, 0);
+  assert.equal(inbox.seen.size, 0);
+});
+
+test('notification API request uses the device scope and resumes after the accepted cursor', async () => {
+  const calls = [];
+  const api = { request: async path => { calls.push(path); return notificationPage(); } };
+  await readNotifications(api, 'device/with space', 12);
+  assert.deepEqual(calls, ['/api/v1/devices/device%2Fwith%20space/notifications?after=12']);
+});
 
 test('startup does not claim success or emit a recovery notice', () => {
   const c = new Connection();
