@@ -93,7 +93,7 @@ def test_single_exec_uses_empty_workspace_and_fixed_safe_arguments(smoke, monkey
     def observe(command, cwd):
         assert list(cwd.iterdir()) == []
         assert cwd.parent == tmp_path / 'system-temp'
-        assert command == ['fixture-cli', '--ignore-user-config', 'exec', '--json', '--sandbox', 'read-only',
+        assert command == ['fixture-cli', 'exec', '--ignore-user-config', '--json', '--sandbox', 'read-only',
                            '--ephemeral', '--skip-git-repo-check', smoke.PROMPT]
         calls.append(cwd)
         return {'status': 'verified', 'real_run_checked': True}
@@ -123,3 +123,35 @@ def test_cleanup_failure_cannot_claim_verified_or_hide_actual_attempt(smoke, mon
     result = smoke.run_smoke()
     assert result['status'] == 'cleanup_failed' and result['real_run_checked'] is True
     assert 'private' not in json.dumps(result)
+
+
+def test_rejected_arguments_block_model_and_do_not_echo_error(smoke, monkeypatch, tmp_path):
+    prepare_profile(smoke, monkeypatch, tmp_path, '--ignore-user-config --ephemeral --skip-git-repo-check')
+    def run(command, **options):
+        if '--json' in command:
+            assert command[-1] == '--help' and smoke.PROMPT not in command
+            return SimpleNamespace(returncode=2, stdout='', stderr="unexpected argument '--ignore-user-config'; private details")
+        return SimpleNamespace(returncode=0, stdout='--ignore-user-config --ephemeral --skip-git-repo-check', stderr='')
+    monkeypatch.setattr(smoke.subprocess, 'run', run)
+    monkeypatch.setattr(smoke, 'observe', lambda *a: pytest.fail('No model task allowed'))
+    result = smoke.run_smoke()
+    assert result['status'] == 'argument_check_failed' and result['real_run_checked'] is False
+    assert result['argument_hint'] == '--ignore-user-config' and 'private' not in json.dumps(result)
+
+
+def test_exact_arguments_help_probe_uses_no_prompt(smoke, monkeypatch, tmp_path):
+    seen = []
+    def run(command, **options):
+        seen.append(command)
+        assert options['cwd'] == tmp_path and options['shell'] is False
+        return SimpleNamespace(returncode=0, stdout='help', stderr='private details')
+    monkeypatch.setattr(smoke.subprocess, 'run', run)
+    assert smoke.check_arguments(['fixture-cli', 'exec', '--json'], tmp_path) is None
+    assert seen == [['fixture-cli', 'exec', '--json', '--help']]
+
+
+def test_exit_two_retains_only_known_argument_hint(smoke, tmp_path):
+    command = [sys.executable, '-c', 'import sys; sys.stderr.write("unexpected argument --json private details"); sys.exit(2)']
+    result = smoke.observe(command, tmp_path, timeout=5)
+    assert result['status'] == 'unexpected_result' and result['exit_code'] == 2
+    assert result['argument_hint'] == '--json' and 'private' not in json.dumps(result)

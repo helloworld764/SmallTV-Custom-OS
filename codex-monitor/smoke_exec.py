@@ -23,6 +23,27 @@ MAX_STREAM_BYTES = 1048576
 PROMPT = 'Reply exactly STORM_OK. Do not use tools, read files, run commands or make changes.'
 
 
+def argument_hint(stderr):
+    # Return only a known flag name, never any part of an arbitrary error message.
+    for flag in ('--ignore-user-config', '--ephemeral', '--skip-git-repo-check', '--sandbox', '--json'):
+        if flag in stderr:
+            return flag
+    return None
+
+
+def check_arguments(command, cwd):
+    """Validate the exact exec option placement through help, without a prompt."""
+    try:
+        result = subprocess.run([*command, '--help'], cwd=cwd, stdin=subprocess.DEVNULL,
+                                capture_output=True, text=True, encoding='utf-8', errors='replace',
+                                timeout=10, shell=False, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+    except (OSError, subprocess.TimeoutExpired):
+        return {'status': 'argument_check_failed', 'argument_hint': None}
+    if result.returncode != 0:
+        return {'status': 'argument_check_failed', 'argument_hint': argument_hint(result.stderr)}
+    return None
+
+
 def stop_process(process):
     """Stop only the process tree created by this test, never other Codex sessions."""
     if os.name == 'nt':
@@ -45,7 +66,7 @@ def observe(command, cwd, timeout=120):
     report = {'status': 'failed_start', 'real_run_checked': False, 'exit_code': None,
               'parser_outcome': 'UNKNOWN', 'parser_reason': None, 'answer_matches': False,
               'event_counts': dict.fromkeys(KNOWN_TYPES, 0), 'unknown_event_count': 0,
-              'stderr_present': False}
+              'stderr_present': False, 'argument_hint': None}
     try:
         process = subprocess.Popen(command, cwd=cwd, stdin=subprocess.DEVNULL,
                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=False,
@@ -74,6 +95,7 @@ def observe(command, cwd, timeout=120):
 
     def stderr_reader():
         size = 0
+        tail = b''
         while not stop.is_set():
             try:
                 chunk = process.stderr.read1(4096)
@@ -83,6 +105,9 @@ def observe(command, cwd, timeout=120):
             if not chunk:
                 break
             report['stderr_present'] = True
+            if report['argument_hint'] is None:
+                report['argument_hint'] = argument_hint((tail + chunk).decode('utf-8', errors='replace'))
+            tail = chunk[-128:]
             size += len(chunk)
             if size > MAX_STREAM_BYTES:
                 excessive.set()
@@ -158,6 +183,8 @@ def observe(command, cwd, timeout=120):
                 stop_process(process)
             except (OSError, subprocess.TimeoutExpired):
                 process.kill()
+        if report['status'] in ('verified', 'unexpected_result'):
+            readers[1].join(timeout=1)
         stop.set()
         try:
             process.wait(timeout=5)
@@ -203,9 +230,10 @@ def run_smoke():
     workspace = Path(tempfile.mkdtemp(prefix='storm-exec-smoke-', dir=parent)).resolve()
     report = base
     try:
-        command = [executable, '--ignore-user-config', 'exec', '--json', '--sandbox', 'read-only',
-                   '--ephemeral', '--skip-git-repo-check', PROMPT]
-        report = observe(command, workspace) | {'cli_version': base['cli_version']}
+        command = [executable, 'exec', '--ignore-user-config', '--json', '--sandbox', 'read-only',
+                   '--ephemeral', '--skip-git-repo-check']
+        failure = check_arguments(command, workspace)
+        report = (base | failure) if failure else (observe([*command, PROMPT], workspace) | {'cli_version': base['cli_version']})
     except OSError:
         report = base | {'status': 'runner_failed', 'real_run_checked': None}
     finally:
