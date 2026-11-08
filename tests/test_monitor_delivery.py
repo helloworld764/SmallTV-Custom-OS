@@ -1,4 +1,4 @@
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 import importlib.util
 import json
 import os
@@ -367,3 +367,122 @@ def test_incomplete_http_response_is_retryable_without_raw_error(modules, monkey
         raise IncompleteRead(b'private truncated response')
     monkeypatch.setattr(client.opener, 'open', broken)
     assert client.request('heartbeat', {}) == (-1, None, 0)
+
+
+def reserved_listener(port=0):
+    listener = socket.socket()
+    listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    listener.bind(('127.0.0.1', port))
+    # Bound but not listening: reserve our test port while the API is offline.
+    return listener
+
+
+@contextmanager
+def running_api(listener, settings):
+    listener.listen()
+    server = uvicorn.Server(uvicorn.Config(create_app(settings), log_level='error', lifespan='on'))
+    thread = Thread(target=server.run, kwargs={'sockets': [listener]}, daemon=True)
+    thread.start()
+    try:
+        deadline = time.monotonic() + 10
+        while not server.started and thread.is_alive() and time.monotonic() < deadline:
+            time.sleep(0.01)
+        assert server.started, 'Isolated API did not start'
+        yield
+    finally:
+        server.should_exit = True
+        thread.join(timeout=10)
+        listener.close()
+        assert not thread.is_alive(), 'Isolated API did not stop'
+
+
+@pytest.mark.parametrize('completed', [True, False], ids=['confirmed-done', 'unconfirmed-eof'])
+@pytest.mark.parametrize('lost_ack', [False, True], ids=['normal-recovery', 'lost-ack-and-second-outage'])
+def test_real_api_outage_restart_and_durable_recovery_without_duplicates(modules, tmp_path, completed, lost_ack):
+    database = Database(tmp_path / 'outage-server.sqlite3')
+    database.initialize()
+    password = secrets.token_urlsafe(24)
+    create_account(database, 'outage-test', password, 'Isolated outage test')
+    settings = Settings(_env_file=None, db_path=database.path, cookie_secure=False)
+    with TestClient(create_app(settings)) as setup:
+        login = setup.post('/api/v1/auth/login', headers={'X-SmallTV-Client': 'web'},
+                           json={'username': 'outage-test', 'password': password}).json()
+        issued = setup.post('/api/v1/agents/codex', headers={'X-CSRF-Token': login['csrf_token']},
+                            json={'name': 'Isolated outage client'}).json()
+
+    listener = reserved_listener()
+    port = listener.getsockname()[1]
+    key = credential(modules, base_url=f'http://127.0.0.1:{port}',
+                     agent_id=issued['agent_id'], token=issued['token'])
+    queue_path = tmp_path / 'outage-client.sqlite3'
+    queue = modules.delivery.Outbox(queue_path, key)
+    sender = modules.delivery.Sender(modules.delivery.Client(key), queue)
+    lines = [{'type': 'turn.started'}]
+    if completed:
+        lines += [{'type': 'item.completed', 'item': {'id': 'fixture', 'type': 'agent_message', 'text': 'STORM_OK'}},
+                  {'type': 'turn.completed', 'usage': {'input_tokens': 1, 'cached_input_tokens': 0, 'output_tokens': 1}}]
+    text = '\n'.join(json.dumps(line) for line in lines) + '\n'
+    command = [sys.executable, '-c', f'import sys; sys.stdout.write({text!r})']
+    try:
+        report = modules.smoke.observe(command, tmp_path, timeout=15,
+                                       event_sink=queue.enqueue, tick=sender.tick)
+        expected_count = 2 if completed else 1
+        assert report['parser_outcome'] == ('DONE' if completed else 'UNKNOWN')
+        assert queue.count() == expected_count
+        assert sender.authenticated is False and sender.heartbeat_confirmed is False
+        with database.connection() as connection:
+            assert connection.execute('SELECT COUNT(*) FROM codex_events').fetchone()[0] == 0
+            assert connection.execute('SELECT COUNT(*) FROM codex_runs').fetchone()[0] == 0
+            assert connection.execute('SELECT COUNT(*) FROM agent_presence').fetchone()[0] == 0
+
+        with closing(queue.connect()) as connection:
+            queued = [json.loads(row[0]) for row in connection.execute('SELECT payload FROM outbox ORDER BY ordinal')]
+        # New objects reconstruct the client after an exit; only SQLite carries state.
+        reopened = modules.delivery.Outbox(queue_path, key)
+        assert reopened.count() == expected_count and reopened.head() == queued[0]
+
+        class DropFirstAcknowledgement(modules.delivery.Client):
+            dropped = False
+            def request(self, route, payload=None):
+                response = super().request(route, payload)
+                if route == 'events' and response[0] == 201 and not self.dropped:
+                    self.dropped = True
+                    return -1, None, 0  # Server committed, but the client received no ACK.
+                return response
+
+        with running_api(listener, settings):
+            client = DropFirstAcknowledgement(key) if lost_ack else modules.delivery.Client(key)
+            recovered = modules.delivery.Sender(client, reopened)
+            if lost_ack:
+                recovered.tick()
+                assert client.dropped and reopened.count() == expected_count
+                with database.connection() as connection:
+                    assert connection.execute('SELECT COUNT(*) FROM codex_events').fetchone()[0] == 1
+                    assert connection.execute('SELECT last_reported_state FROM codex_runs').fetchone()[0] == 'WORKING'
+            else:
+                result = recovered.flush(timeout=5)
+                assert result == {'pending': 0, 'blocked': None, 'connected': True}
+
+        if lost_ack:
+            # The API is really stopped now. Another network failure must retain the same payloads.
+            listener = reserved_listener(port)
+            offline_queue = modules.delivery.Outbox(queue_path, key)
+            offline = modules.delivery.Sender(modules.delivery.Client(key), offline_queue)
+            offline.tick()
+            assert not offline.authenticated and offline_queue.count() == expected_count
+            assert offline_queue.head() == queued[0]
+            with running_api(listener, settings):
+                final_queue = modules.delivery.Outbox(queue_path, key)
+                final_sender = modules.delivery.Sender(modules.delivery.Client(key), final_queue)
+                result = final_sender.flush(timeout=8)
+                assert result == {'pending': 0, 'blocked': None, 'connected': True}
+
+        with database.connection() as connection:
+            saved = connection.execute('''SELECT event_id, run_id, sequence, kind, occurred_at
+                FROM codex_events ORDER BY sequence''').fetchall()
+            assert [dict(row) for row in saved] == queued
+            assert connection.execute('SELECT COUNT(*) FROM codex_runs').fetchone()[0] == 1
+            assert connection.execute('SELECT last_reported_state FROM codex_runs').fetchone()[0] == ('DONE' if completed else 'WORKING')
+        assert modules.delivery.Outbox(queue_path, key).count() == 0
+    finally:
+        listener.close()
