@@ -160,7 +160,9 @@ def dispatch(connection, link, text, now):
         pref = preferences(connection, uid)
         rows = [[('Выключить все' if pref['enabled'] else 'Включить уведомления', 'notify:enabled')]]
         rows += [[(('✓ ' if pref[key] else '— ')+LABELS[key], 'notify:'+key)] for key in CATEGORIES]
-        return 'Настройки рассылки сохранены. Доставка событий появится следующим этапом. Выключение всех сохраняет выбор категорий.', buttons(rows)
+        status = '🔔 Уведомления включены.' if pref['enabled'] else '🔕 Все уведомления выключены.'
+        return (status+'\n\nГалочки — сохранённый выбор категорий. Общий выключатель временно отключает все категории, сохраняя выбор.'
+                '\n\nДоставка событий появится следующим этапом.'), buttons(rows)
     if text == 'unlink-confirm':
         return 'Отключить этот Telegram от аккаунта?', buttons([[('Да, отключить', 'unlink'), ('Отмена', 'settings')]])
     if text == 'unlink':
