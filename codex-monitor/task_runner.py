@@ -5,6 +5,7 @@ import errno
 import os
 from pathlib import Path
 import shutil
+import sys
 
 from check_cli import probe_cli
 from smoke_exec import check_arguments, observe
@@ -68,6 +69,11 @@ def run_task(prompt, cwd, *, timeout=1800, event_sink=None, tick=None, show_answ
         return base | {'status': 'not_found'}
     command = [executable, 'exec', '--ignore-user-config', '--json', '--sandbox', 'read-only',
                '--ephemeral', '--skip-git-repo-check']
+    # Ignoring user config also removes windows.sandbox. Native Windows then
+    # rejects even read commands before execution. Keep the OS sandbox enabled
+    # explicitly; this does not broaden the fixed read-only permission profile.
+    if sys.platform == 'win32':
+        command.extend(['-c', 'windows.sandbox="elevated"'])
     failure = check_arguments(command, root)
     if failure:
         return base | failure

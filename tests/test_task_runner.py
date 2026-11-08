@@ -108,6 +108,26 @@ def test_bad_argument_probe_blocks_task(task, monkeypatch, tmp_path):
     assert task.run_task('private prompt', tmp_path)['status'] == 'argument_check_failed'
 
 
+@pytest.mark.parametrize('platform', ['win32', 'linux'])
+def test_windows_sandbox_is_explicit_without_broadening_permissions(task, monkeypatch, tmp_path, platform):
+    from types import SimpleNamespace
+    monkeypatch.setattr(task, 'sys', SimpleNamespace(platform=platform))
+    monkeypatch.setattr(task, 'probe_cli', lambda: {'status': 'manual_verification_required', 'cli_version': '0.167.0'})
+    monkeypatch.setattr(task.shutil, 'which', lambda name: 'fixture-cli')
+    checked = []
+    monkeypatch.setattr(task, 'check_arguments', lambda command, cwd: checked.append(command.copy()))
+    def observe(command, cwd, **options):
+        assert command == [*checked[0], '-']
+        assert ('windows.sandbox="elevated"' in command) == (platform == 'win32')
+        assert command[command.index('--sandbox') + 1] == 'read-only'
+        assert '--ignore-user-config' in command
+        assert '--ignore-rules' not in command
+        assert not any('danger-full-access' in value or 'bypass' in value for value in command)
+        return {'status': 'verified'}
+    monkeypatch.setattr(task, 'observe', observe)
+    assert task.run_task('Read a public fixture', tmp_path)['status'] == 'verified'
+
+
 @pytest.mark.parametrize('prompt,timeout', [('', 100), (' ', 100), ('x'*32769, 100), ('x', 0), ('x', 7201)])
 def test_invalid_task_inputs_do_not_probe_or_run_cli(task, monkeypatch, tmp_path, prompt, timeout):
     monkeypatch.setattr(task, 'probe_cli', lambda: pytest.fail('No CLI access allowed'))
