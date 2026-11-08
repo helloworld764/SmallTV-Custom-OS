@@ -21,6 +21,7 @@ from .agents import router as agents_router
 from .codex_events import router as codex_events_router
 from .device_presence import router as device_presence_router
 from .display_events import router as display_events_router
+from .pets import router as pets_router
 
 
 class Health(BaseModel):
@@ -75,6 +76,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(codex_events_router)
     app.include_router(device_presence_router)
     app.include_router(display_events_router)
+    app.include_router(pets_router)
 
     @app.get("/health", response_model=Health)
     def health(response: Response) -> Health:

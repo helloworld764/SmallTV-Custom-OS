@@ -91,7 +91,9 @@ Cookie HttpOnly, SameSite=Strict, host-only; Secure включается для 
 ## Ограничения
 
 Аппаратный provisioning, полная админ-панель, мониторинг Debian, общая доставка событий,
-Tamagotchi, Telegram, медиа-конвертация, OTA и постоянный Monitor всех сессий отсутствуют.
+Игровой UI Tamagotchi, Telegram, медиа-конвертация, OTA и постоянный Monitor всех сессий отсутствуют.
+Первое серверное ядро Tamagotchi с SQLite, идемпотентными действиями и 72+24 часа
+реализовано без привязки к оборудованию: [pet-engine.md](pet-engine.md).
 Каталог firmware содержит только описание будущего компонента. В codex-monitor
 есть диагностика, парсер и локальный мост run-smoke/run-task с outbox/heartbeat/DPAPI.
 Есть обёртка run-task для явно запускаемых read-only задач; постоянного

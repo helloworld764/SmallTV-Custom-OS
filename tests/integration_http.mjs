@@ -42,6 +42,20 @@ preview.fail(0);
 assert.equal(preview.state, 'stale');
 preview.apply(await client.settings('integration-tv'), Date.now());
 assert.equal(preview.state, 'fresh');
+const pet = await client.request('/api/v1/pets', {
+  method: 'POST', body: { kind: 'Pixel', name: 'Мур' }, headers: { 'X-CSRF-Token': session.csrf_token },
+});
+assert.equal(pet.name, 'Мур');
+assert.equal(pet.lifecycle, 'ACTIVE');
+const petAction = { action_id: randomUUID(), action: 'feed' };
+const feed = () => client.request(`/api/v1/pets/${pet.id}/actions`, {
+  method: 'POST', body: petAction, headers: { 'X-CSRF-Token': session.csrf_token },
+});
+assert.equal((await feed()).reaction.kind, 'FEED');
+assert.equal((await feed()).duplicate, true);
+const petState = await client.request('/api/v1/pets/current');
+assert.ok(petState.satiety > 99 && petState.satiety <= 100);
+assert.equal(petState.reaction.id, petAction.action_id);
 await assert.rejects(client.settings('foreign-tv'), error => error.status === 404);
 await checkHealth(fetcher, new AbortController().signal);
 const pairing = await client.request('/api/v1/devices/enrollment-codes', {
@@ -110,6 +124,7 @@ for (const path of ['/panel/', '/simulator/?device=integration-tv', '/simulator/
   assert.equal((await fetcher(path)).status, 200);
 }
 await client.logout(session.csrf_token);
+await assert.rejects(client.request('/api/v1/pets/current'), error => error.status === 401);
 await assert.rejects(readNotifications(client, 'integration-tv', inbox.cursor), error => error.status === 401);
 inbox.reset();
 try { await client.settings('integration-tv'); assert.fail('Session should be revoked'); }

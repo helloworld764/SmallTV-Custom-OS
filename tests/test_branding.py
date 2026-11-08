@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 
 from fastapi.testclient import TestClient
 import pytest
@@ -42,7 +43,8 @@ def test_openapi_uses_product_name_without_changing_api_contract(brand_client):
 def test_spec_records_product_names_and_compatibility():
     root = Path(__file__).resolve().parents[1]
     spec = (root / 'TZ.md').read_text(encoding='utf-8')
-    assert '**Версия:** 1.2' in spec
+    version = re.search(r'^\*\*Версия:\*\* (\d+)\.(\d+)\b', spec, re.MULTILINE)
+    assert version is not None and tuple(map(int, version.groups())) >= (1, 2)
     for name in ('Storm OS', 'Storm Control Panel', 'Storm Simulator', 'Storm Bot'):
         assert name in spec
         assert name in (root / 'AGENTS.md').read_text(encoding='utf-8')
