@@ -60,6 +60,59 @@ def test_output_limit_stops_fixture_without_printing_it(smoke, tmp_path, monkeyp
     assert result['status'] == 'output_limit' and 'private' not in json.dumps(result)
 
 
+@pytest.mark.parametrize('character', ['x', '\u044f'])
+def test_large_command_output_event_can_complete_without_leaking_contents(smoke, tmp_path, character):
+    # Generate in the child: Windows cannot accept a 90K command-line argument.
+    code = (
+        'import json; '
+        'print(json.dumps({"type":"turn.started"})); '
+        'print(json.dumps({"type":"item.completed","item":{"id":"read",'
+        '"type":"command_execution","aggregated_output":'
+        f'"private-marker"+{ascii(character)}*90000' '}} , ensure_ascii=False)); '
+        'print(json.dumps({"type":"turn.completed","usage":'
+        '{"input_tokens":1,"cached_input_tokens":0,"output_tokens":1}}))'
+    )
+    # Force UTF-8 independently of the Windows console code page.
+    command = [sys.executable, '-X', 'utf8', '-c', code]
+    events = []
+    result = smoke.observe(command, tmp_path, timeout=5, require_answer=False, event_sink=events.append)
+    assert result['status'] == 'verified' and result['parser_outcome'] == 'DONE'
+    assert result['event_counts']['item.completed'] == 1
+    assert [event['kind'] for event in events] == ['START', 'DONE']
+    assert 'private-marker' not in json.dumps(result) + json.dumps(events)
+
+
+@pytest.mark.parametrize('trailing_newline', [True, False])
+def test_oversized_valid_event_has_explicit_limit_and_no_done(smoke, tmp_path, trailing_newline):
+    code = (
+        'import json; print(json.dumps({"type":"turn.started"})); '
+        'print(json.dumps({"type":"item.completed","item":{"id":"read",'
+        f'"type":"command_execution","aggregated_output":"private-marker"+"x"*{smoke.MAX_LINE_CHARS}' '}}), '
+        f'end={repr(chr(10) if trailing_newline else "")})'
+    )
+    events = []
+    result = smoke.observe([sys.executable, '-c', code], tmp_path, timeout=5,
+                           require_answer=False, event_sink=events.append)
+    assert result['status'] == 'output_limit' and result['parser_reason'] == 'line_limit'
+    assert result['parser_outcome'] == 'UNKNOWN'
+    assert [event['kind'] for event in events] == ['START']
+    assert 'private-marker' not in json.dumps(result) + json.dumps(events)
+
+
+def test_total_stream_limit_still_applies_to_individually_valid_events(smoke, tmp_path):
+    code = (
+        'import json; print(json.dumps({"type":"turn.started"})); '
+        'event=json.dumps({"type":"item.completed","item":{"id":"read",'
+        '"type":"command_execution","aggregated_output":"x"*90000}}); '
+        '[print(event) for _ in range(13)]'
+    )
+    events = []
+    result = smoke.observe([sys.executable, '-c', code], tmp_path, timeout=5,
+                           require_answer=False, event_sink=events.append)
+    assert result['status'] == 'output_limit' and result['parser_outcome'] == 'UNKNOWN'
+    assert [event['kind'] for event in events] == ['START']
+
+
 def test_missing_cli_does_not_start_model(smoke, monkeypatch):
     monkeypatch.setattr(smoke, 'probe_cli', lambda: {'status': 'not_found', 'cli_version': None})
     monkeypatch.setattr(smoke, 'observe', lambda *a, **k: pytest.fail('No exec allowed'))

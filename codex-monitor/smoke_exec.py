@@ -209,13 +209,13 @@ def observe(command, cwd, timeout=120, *, event_sink=None, tick=None, input_text
             while b'\n' in pending:
                 raw, pending = pending.split(b'\n', 1)
                 if not consume(raw):
-                    report['status'] = 'parser_rejected'
+                    report['status'] = 'output_limit' if parser.reason == 'line_limit' else 'parser_rejected'
                     break
             else:
                 if chunk:
                     continue
                 if pending and not consume(pending):
-                    report['status'] = 'parser_rejected'
+                    report['status'] = 'output_limit' if parser.reason == 'line_limit' else 'parser_rejected'
                     break
                 process.wait(timeout=max(0.01, deadline - time.monotonic()))
                 if writer is not None:

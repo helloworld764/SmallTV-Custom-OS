@@ -6,7 +6,9 @@ import time
 from uuid import uuid4
 
 
-MAX_LINE_CHARS = 65536
+# Command output is embedded in one JSONL event, including multi-file reads.
+# The process observer separately caps the entire byte stream at 1 MiB.
+MAX_LINE_CHARS = 262144
 
 
 @dataclass(frozen=True)
@@ -71,8 +73,11 @@ class ExecEvents:
             raise RuntimeError('Parser already finalized')
         if self._invalid:
             return []
-        if not isinstance(line, str) or len(line) > MAX_LINE_CHARS:
+        if not isinstance(line, str):
             self._invalidate('invalid_line')
+            return []
+        if len(line) > MAX_LINE_CHARS:
+            self._invalidate('line_limit')
             return []
         if not line.strip():
             return []
