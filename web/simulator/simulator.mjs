@@ -2,6 +2,7 @@ import { Connection, checkHealth } from './connection.mjs';
 import { ApiClient } from '../panel/api.mjs';
 import { PreviewSettings, THEMES } from './preview.mjs';
 import { Notifications, readNotifications } from './notifications.mjs';
+import { drawPetFrame, petPresentation, PET_SHEETS } from './pet-display.mjs';
 
 const connection = new Connection();
 const deviceId = new URLSearchParams(window.location.search).get('device');
@@ -17,6 +18,81 @@ const labels = {
   stale: 'Данные устарели · проверяем', offline: 'Связь с backend потеряна',
 };
 const eventStatus = document.querySelector('#event-status');
+const petCanvas = document.querySelector('#pet-art');
+const petContext = petCanvas.getContext('2d');
+const petImages = new Map();
+let currentPet = null;
+let petError = 'Питомец ещё не загружен.';
+let petTimer = null;
+const petScreenIsReady = () => preview.state === 'fresh' && preview.settings.start_screen === 'tamagotchi';
+
+function setText(id, value) {
+  const element = document.querySelector(id);
+  if (element.textContent !== value) element.textContent = value;
+}
+
+function schedulePetPoll(delay = 1000) {
+  if (petTimer !== null || !petScreenIsReady()) return;
+  petTimer = setTimeout(() => { petTimer = null; void pollPet(); }, delay);
+}
+
+async function pollPet() {
+  if (!petScreenIsReady()) return;
+  try {
+    const pet = await api.currentPet();
+    if (!pet || typeof pet.name !== 'string' || !PET_SHEETS[pet.kind]
+        || !['ACTIVE', 'ABSENT', 'RETURN_AVAILABLE', 'UNKNOWN'].includes(pet.lifecycle)
+        || !Number.isSafeInteger(pet.server_time)) throw new Error('Invalid pet response');
+    currentPet = pet;
+    petError = '';
+    setText('#pet-preview-status', 'Состояние питомца загружено из аккаунта текущей сессии.');
+  } catch (error) {
+    currentPet = null;
+    petError = error.status === 404 ? 'Питомец ещё не создан.'
+      : error.status === 401 ? 'Войдите в панель, чтобы увидеть питомца.'
+        : 'Состояние питомца временно недоступно.';
+    setText('#pet-preview-status', petError);
+  }
+  drawCurrentPet();
+  schedulePetPoll(currentPet?.lifecycle === 'ACTIVE' ? 1000 : 5000);
+}
+
+function drawCurrentPet() {
+  const showingPet = preview.settings.start_screen === 'tamagotchi' && Boolean(deviceId)
+    && preview.canDisplaySettings;
+  document.querySelector('#pet-content').hidden = !showingPet;
+  if (!showingPet) return;
+  if (!currentPet) {
+    petContext.clearRect(0, 0, petCanvas.width, petCanvas.height);
+    setText('#pet-name', '');
+    setText('#pet-caption', petError);
+    return;
+  }
+  const presentation = petPresentation(currentPet, currentPet.server_time);
+  setText('#pet-name', currentPet.name);
+  setText('#pet-caption', presentation.label);
+  const ariaLabel = `Питомец ${currentPet.name}: ${presentation.label}`;
+  if (petCanvas.getAttribute('aria-label') !== ariaLabel) petCanvas.setAttribute('aria-label', ariaLabel);
+  let image = petImages.get(currentPet.kind);
+  if (!image) {
+    const kind = currentPet.kind;
+    image = new Image();
+    petImages.set(kind, image);
+    image.onload = () => drawCurrentPet();
+    image.onerror = () => {
+      petImages.delete(kind);
+      if (currentPet?.kind !== kind) return;
+      petError = 'Не удалось загрузить изображение питомца.';
+      currentPet = null;
+      drawCurrentPet();
+    };
+    image.src = PET_SHEETS[currentPet.kind].src;
+  }
+  if (image.complete && image.naturalWidth) {
+    drawPetFrame(petContext, image, currentPet.kind, presentation.state,
+      petCanvas.width, petCanvas.height);
+  }
+}
 
 function renderPreview() {
   const settings = preview.settings;
@@ -24,8 +100,9 @@ function renderPreview() {
   document.querySelector('#screen-content').style.opacity = preview.canDisplaySettings ? settings.brightness / 100 : 0;
   const clock = settings.start_screen === 'clock';
   document.querySelector('#clock-content').hidden = !clock;
-  document.querySelector('#placeholder').hidden = clock;
+  document.querySelector('#placeholder').hidden = clock || settings.start_screen === 'tamagotchi';
   document.querySelector('#screen-title').textContent = preview.screenTitle;
+  drawCurrentPet();
   const labels = {
     standalone: 'Автономное превью часов. Откройте превью из настроек устройства, чтобы читать их с сервера.',
     loading: 'Читаем сохранённые настройки устройства…',
@@ -84,11 +161,27 @@ async function poll() {
           eventStatus.textContent = 'Уведомления временно недоступны; повторим проверку.';
         }
       }
+      if (petScreenIsReady()) {
+        schedulePetPoll(0);
+      } else {
+        if (petTimer !== null) clearTimeout(petTimer);
+        petTimer = null;
+        currentPet = null;
+        petError = preview.state === 'signed-out' ? 'Войдите в панель, чтобы увидеть питомца.'
+          : 'Выберите экран Tamagotchi в настройках устройства.';
+      }
     } else {
       preview.fail();
+      if (petTimer !== null) clearTimeout(petTimer);
+      petTimer = null;
+      currentPet = null;
+      petError = 'Связь с backend потеряна.';
       eventStatus.textContent = 'Уведомления временно недоступны; повторим проверку.';
     }
     renderPreview();
+  } else {
+    setText('#pet-preview-status', 'Откройте превью из панели управления, чтобы загрузить питомца.');
+    drawCurrentPet();
   }
   // Schedule only after completion: requests cannot overlap.
   setTimeout(poll, connection.delay);

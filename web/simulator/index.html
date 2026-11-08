@@ -20,6 +20,10 @@
         <div id="screen-content">
           <div id="clock-content"><div id="clock">--:--:--</div><div id="date"></div></div>
           <div id="placeholder" hidden><strong id="screen-title"></strong><p>Экран ещё не подключён</p></div>
+          <div id="pet-content" hidden>
+            <canvas id="pet-art" width="144" height="68" aria-label="Питомец"></canvas>
+            <div id="pet-name"></div><div id="pet-caption">Загружаем питомца…</div>
+          </div>
         </div>
         <div id="status" role="status">Проверка связи…</div>
         <div id="notice" hidden></div>
@@ -29,6 +33,7 @@
     <p id="checked">Успешных проверок ещё нет.</p>
     <p id="preview-status" role="status">Автономное превью часов.</p>
     <p id="event-status" role="status">Уведомления Codex доступны в превью выбранного устройства после входа в панель.</p>
+    <p id="pet-preview-status" role="status">Экран Tamagotchi доступен в превью выбранного устройства после входа и создания питомца.</p>
     <p>Индикатор показывает доступность API, а не питание ноутбука.<br>
        Часы используют время и часовой пояс браузера.</p>
     <details>

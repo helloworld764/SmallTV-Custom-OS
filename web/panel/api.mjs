@@ -55,6 +55,7 @@ export class ApiClient {
   async settings(id) {
     return settingsData(await this.request(`/api/v1/devices/${encodeURIComponent(id)}/settings`), id);
   }
+  async currentPet() { return this.request('/api/v1/pets/current'); }
   async save(id, changes, csrf) {
     return settingsData(await this.request(`/api/v1/devices/${encodeURIComponent(id)}/settings`, {
       method: 'PATCH', body: changes, headers: { 'X-CSRF-Token': csrf },

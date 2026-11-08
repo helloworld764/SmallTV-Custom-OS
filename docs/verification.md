@@ -7,6 +7,22 @@
 Постоянного наблюдения за всеми сессиями, Debian-приёмки и аппаратной проверки нет.
 Актуальные границы: [architecture.md](architecture.md), [task-runner.md](task-runner.md).
 
+## 8 ноября 2026 — питомец в Storm Simulator
+
+После одобрения владельцем внешнего вида подключены кадры Pixel, Byte и Glitch
+к авторизованному экрану Tamagotchi. Симулятор читает состояние владельца из API,
+показывает короткие реакции и серверные эмоции; Null/reference PNG не включены
+в публичный static-каталог. Кадры выводятся равными ячейками 3×3 с пометкой, что
+это геометрия превью, а не координаты для прошивки.
+
+- Полный `python -m pytest -q`: **406 passed**, без пропусков; одно существующее
+  предупреждение Starlette о связке TestClient/httpx.
+- JavaScript-набор: **40 passed**, включая четыре новых теста отображения питомцев.
+- Последний целевой Python-прогон `tests/test_pet_art.py tests/test_backend.py`:
+  **24 passed**; проверены копии/хеши PNG, MIME и 404 для Null/private assets.
+- `node --check` для `simulator.mjs` и `pet-display.mjs` прошёл.
+- Browser UI и реальное устройство этой проверкой не подтверждались.
+
 ## 8 ноября 2026 — ресурсы состояний питомцев для визуального согласования
 
 Сохранены точные копии выбранных владельцем четырёх PNG и четыре основных
@@ -37,7 +53,7 @@ HTTP-выдачи приватных ресурсов. Тест учитывае
 
 - Полный `python -m pytest -q`: **399 passed**, без пропусков, одно прежнее
   предупреждение Starlette/httpx.
-- `node --test tests/simulator.test.mjs tests/panel.test.mjs tests/branding.test.mjs tests/site-theme.test.mjs`:
+- `node --test tests/simulator.test.mjs tests/panel.test.mjs tests/branding.test.mjs tests/site-theme.test.mjs tests/pet-display.test.mjs`:
   **36 passed**.
 - После обновления ТЗ обнаружен старый тест, жёстко требовавший версию 1.2;
   он обновлён на совместимую проверку версии ≥1.2, остальные проверки бренда

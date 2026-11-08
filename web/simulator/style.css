@@ -18,6 +18,12 @@ header { font-size: 12px; letter-spacing: 2px; color: var(--screen-accent); disp
 #placeholder { text-align: center; padding-top: 12px; }
 #placeholder strong { font-size: 20px; }
 #placeholder p { font-size: 12px; color: var(--screen-text); }
+#pet-content { text-align: center; min-height: 96px; margin-top: -5px; }
+#pet-art { display: block; width: 144px; height: 68px; margin: 0 auto -1px; image-rendering: pixelated; animation: pet-breathe 8s ease-in-out infinite; }
+#pet-name { color: var(--screen-accent); font-size: 12px; line-height: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#pet-caption { color: var(--screen-text); font-size: 10px; line-height: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@keyframes pet-breathe { 50% { transform: translateY(-1px) scale(1.008); } }
+@media (prefers-reduced-motion: reduce) { #pet-art { animation: none; } }
 #date { font-size: 13px; text-align: center; margin-top: 8px; }
 #status { font-size: 11px; color: var(--screen-text); text-align: center; margin-top: 6px; }
 footer { position: absolute; bottom: 12px; font-size: 9px; letter-spacing: 1px; color: #9999a4; }

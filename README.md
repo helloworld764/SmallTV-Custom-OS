@@ -19,8 +19,8 @@ FastAPI backend, SQLite, веб-панель управления и симул�
 backend/app/      API, конфигурация и точка запуска
 backend/migrations/  нумерованные SQL-миграции
 firmware/         описание будущего аппаратного компонента, без прошивки
-assets/pets/     исходники, обзорные состояния и локальный просмотр (вне HTTP)
-web/simulator/   HTML/CSS/JS симулятор, без сборщика и npm-зависимостей
+assets/pets/     исходники, приватный просмотр и обзорные листы
+web/simulator/   HTML/CSS/JS симулятор и три публичных кадра каталога
 web/panel/       локальная веб-панель: вход, устройства и настройки
 codex-monitor/   read-only задачи Codex, парсер, outbox/heartbeat и DPAPI
 docs/            архитектура и границы первого этапа
@@ -35,9 +35,11 @@ SQLite хранит базовый реестр пользователей, ус
 исчезновение 72+24 часа и семантические реакции API: [docs/pet-engine.md](docs/pet-engine.md).
 Игровой UI, Telegram, медиа, OTA, реальная прошивка и постоянный монитор всех сессий
 ещё не реализованы. Социальные функции согласованы после основных в ТЗ v1.3.
-Подготовлены обзорные листы состояний всех четырёх питомцев и локальная страница
-просмотра: [docs/pet-art-preparation.md](docs/pet-art-preparation.md).
-Это ресурсы для согласования, они ещё не подключены к рабочему API/прошивке.
+Внешний вид всех четырёх персонажей одобрен владельцем. Три общих питомца
+подключены к авторизованному превью Tamagotchi в Storm Simulator; оно читает
+реакции из API. Null остаётся личным и не публикуется по HTTP. Подробности и
+ограничения сетки кадров: [docs/pet-display-preview.md](docs/pet-display-preview.md).
+Это превью не является браузерной игрой или проверкой прошивки.
 
 ## Windows (PowerShell)
 
@@ -86,8 +88,9 @@ python3 -m venv .venv
 `/simulator/?device=<id>` читает сохранённые настройки через защищённый API.
 Применяются тема, яркость содержимого и стартовый экран. Индикатор backend
 остаётся видимым даже при нулевой яркости превью.
-Неподключённые экраны (погода, мониторинг, Codex, Null, Tamagotchi) явно помечены,
-без вымышленных показателей. Их выбор не означает готовность этих модулей.
+Неподключённые экраны (погода, мониторинг, Codex и Null) явно помечены,
+без вымышленных показателей. Tamagotchi показывает питомца и его API-состояние,
+если он создан у вошедшего пользователя; игровые действия и браузерная игра не добавлены.
 
 Превью проверяет настройки после успешной проверки backend, без параллельных
 запросов. Изменения из панели появятся в следующем цикле опроса. При сетевом сбое
@@ -304,14 +307,14 @@ Windows:
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest
-node --test tests/simulator.test.mjs tests/panel.test.mjs tests/branding.test.mjs tests/site-theme.test.mjs
+node --test tests/simulator.test.mjs tests/panel.test.mjs tests/branding.test.mjs tests/site-theme.test.mjs tests/pet-display.test.mjs
 ```
 
 Debian:
 
 ```bash
 .venv/bin/python -m pytest
-node --test tests/simulator.test.mjs tests/panel.test.mjs tests/branding.test.mjs tests/site-theme.test.mjs
+node --test tests/simulator.test.mjs tests/panel.test.mjs tests/branding.test.mjs tests/site-theme.test.mjs tests/pet-display.test.mjs
 ```
 
 Node.js 20+ нужен только для JavaScript-тестов; симулятор работает в современном

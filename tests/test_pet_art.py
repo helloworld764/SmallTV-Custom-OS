@@ -13,6 +13,7 @@ from backend.app.main import create_app
 
 ROOT = Path(__file__).resolve().parents[1] / 'assets' / 'pets'
 MANIFEST = json.loads((ROOT / 'manifest.json').read_text(encoding='utf-8'))
+SIMULATOR_PETS = Path(__file__).resolve().parents[1] / 'web' / 'simulator' / 'pets'
 
 
 def verify_png(record):
@@ -54,7 +55,7 @@ def verify_png(record):
 def test_original_and_review_sheet_match_manifest_without_private_metadata(character):
     verify_png(character['reference'])
     verify_png(character['sheet'])
-    assert character['approval'] == 'pending_visual_approval'
+    assert character['approval'] == 'appearance_approved'
     assert character['columns'] == character['rows'] == 3
     assert character['access'] == ('owner_only' if character['id'] == 'Null' else 'catalog')
 
@@ -75,8 +76,34 @@ def test_review_is_not_enabled_and_generation_inputs_are_reproducible():
             assert (ROOT / file).is_file()
 
 
+def test_public_simulator_assets_match_approved_catalogue_and_exclude_null():
+    runtime = json.loads((SIMULATOR_PETS / 'manifest.json').read_text(encoding='utf-8'))
+    assert runtime['purpose'].startswith('authenticated simulator preview')
+    assert runtime['grid'] == {'columns': 3, 'rows': 3, 'cell_geometry': 'equal thirds preview'}
+    assert runtime['hardware_compatibility'] == 'unverified'
+    assert [row['id'] for row in runtime['characters']] == ['Pixel', 'Byte', 'Glitch']
+    assert runtime['null']['included'] is False
+    sources = {row['id']: row for row in MANIFEST['characters']}
+    for character in runtime['characters']:
+        assert character['access'] == 'catalog'
+        assert character['approval'] == 'appearance_approved'
+        path = SIMULATOR_PETS / character['file']
+        data = path.read_bytes()
+        assert hashlib.sha256(data).hexdigest() == character['sha256']
+        assert data == (ROOT / sources[character['id']]['sheet']['file']).read_bytes()
+        assert struct.unpack('>II', data[16:24]) == (character['width'], character['height'])
+
+
 def test_private_review_and_null_assets_are_not_http_static_files(tmp_path):
     with TestClient(create_app(Settings(_env_file=None, db_path=tmp_path / 'art.sqlite3'))) as client:
         for path in ('/assets/pets/references/Null.png', '/assets/pets/review/index.html',
                      '/assets/pets/manifest.json', '/shared/%2e%2e/%2e%2e/assets/pets/references/Null.png'):
             assert client.get(path).status_code == 404
+        assert client.get('/simulator/pets/manifest.json').status_code == 200
+        for name in ('Pixel', 'Byte', 'Glitch'):
+            response = client.get(f'/simulator/pets/{name}-states.png')
+            assert response.status_code == 200
+            assert response.headers['content-type'] == 'image/png'
+            assert response.headers.get('etag')
+        assert client.get('/simulator/pets/Null-states.png').status_code == 404
+        assert client.get('/simulator/pets/../../assets/pets/references/Null.png').status_code == 404

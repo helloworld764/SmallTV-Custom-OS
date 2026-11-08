@@ -27,8 +27,13 @@ def test_simulator_and_assets_are_served(client):
     assert response.status_code == 200
     assert 'text/html' in response.headers['content-type']
     assert 'lang="ru"' in response.text
-    for asset in ('style.css', 'simulator.mjs', 'connection.mjs', 'preview.mjs'):
+    for asset in ('style.css', 'simulator.mjs', 'connection.mjs', 'preview.mjs', 'pet-display.mjs', 'pets/manifest.json'):
         assert client.get(f'/simulator/{asset}').status_code == 200
+    for name in ('Pixel', 'Byte', 'Glitch'):
+        response = client.get(f'/simulator/pets/{name}-states.png')
+        assert response.status_code == 200
+        assert response.headers['content-type'] == 'image/png'
+    assert client.get('/simulator/pets/Null-states.png').status_code == 404
 
 
 def test_unknown_route_and_method(client):

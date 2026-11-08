@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "purpose": "authenticated simulator preview; not a firmware sprite pack",
+  "grid": { "columns": 3, "rows": 3, "cell_geometry": "equal thirds preview" },
+  "states": ["neutral", "happy", "eating", "playing", "sleeping", "waking", "hungry_sad", "tired", "blink"],
+  "characters": [
+    {
+      "id": "Pixel",
+      "access": "catalog",
+      "approval": "appearance_approved",
+      "file": "Pixel-states.png",
+      "width": 1254,
+      "height": 1254,
+      "sha256": "5be0e3cfb331ea999393fbbccf785860cc8a7d4ccdd052b6f340ac374665f19e"
+    },
+    {
+      "id": "Byte",
+      "access": "catalog",
+      "approval": "appearance_approved",
+      "file": "Byte-states.png",
+      "width": 1261,
+      "height": 1247,
+      "sha256": "f282e8689b9bab2e385d3b963edfdc45af7abdd2eff6b1465078e767d53ea754"
+    },
+    {
+      "id": "Glitch",
+      "access": "catalog",
+      "approval": "appearance_approved",
+      "file": "Glitch-states.png",
+      "width": 1312,
+      "height": 1199,
+      "sha256": "ee6808207a3f90d7af245964b829d69212bd49f64ba073cca79b7646a3349066"
+    }
+  ],
+  "null": {
+    "included": false,
+    "reason": "owner-only reference; no public HTTP asset"
+  },
+  "hardware_compatibility": "unverified"
+}

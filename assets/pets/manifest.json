@@ -18,7 +18,7 @@
     {
       "id": "Pixel",
       "access": "catalog",
-      "approval": "pending_visual_approval",
+      "approval": "appearance_approved",
       "reference": {
         "file": "references/Pixel.png",
         "width": 1254,
@@ -44,7 +44,7 @@
     {
       "id": "Byte",
       "access": "catalog",
-      "approval": "pending_visual_approval",
+      "approval": "appearance_approved",
       "reference": {
         "file": "references/Byte.png",
         "width": 1254,
@@ -70,7 +70,7 @@
     {
       "id": "Glitch",
       "access": "catalog",
-      "approval": "pending_visual_approval",
+      "approval": "appearance_approved",
       "reference": {
         "file": "references/Glitch.png",
         "width": 1254,
@@ -96,7 +96,7 @@
     {
       "id": "Null",
       "access": "owner_only",
-      "approval": "pending_visual_approval",
+      "approval": "appearance_approved",
       "reference": {
         "file": "references/Null.png",
         "width": 1024,
