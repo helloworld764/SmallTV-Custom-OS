@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     device_offline_seconds: int = Field(default=90, ge=15, le=86400)
     weather_cache_seconds: int = Field(default=900, ge=300, le=1800)
     weather_timeout_seconds: float = Field(default=4.0, gt=0, le=15)
+    telegram_bot_token: SecretStr | None = Field(default=None, repr=False)
 
     @model_validator(mode="after")
     def validate_agent_timeouts(self):

@@ -2,6 +2,23 @@ import { ApiClient, ApiError, changesFrom, hasDraftChanges } from './api.mjs';
 
 const $ = selector => document.querySelector(selector);
 const state = { session: null, devices: [], selected: null, settings: null, busy: false, more: false };
+let telegramCodeTimer;
+
+function clearTelegramCode() {
+  clearTimeout(telegramCodeTimer);
+  $('#telegram-secret').textContent = '';
+  $('#telegram-secret').hidden = true;
+}
+
+async function loadTelegramStatus() {
+  const result = await api.telegramStatus();
+  if (typeof result?.linked !== 'boolean') throw new ApiError(502, 'protocol');
+  $('#telegram-status').textContent = result.linked ? 'Telegram подключён к аккаунту.' : 'Telegram ещё не подключён.';
+  $('#telegram-code').hidden = result.linked;
+  $('#telegram-cancel').hidden = result.linked;
+  $('#telegram-unlink').hidden = !result.linked;
+  if (result.linked) clearTelegramCode();
+}
 const api = new ApiClient({ onConnection(online) {
   $('#connection').textContent = online ? 'Последний запрос: сервер доступен' : 'Нет связи с сервером';
   $('#connection').dataset.state = online ? 'online' : 'offline';
@@ -32,10 +49,12 @@ function setBusy(busy) {
   $('#settings-fields').disabled = busy;
   $('#weather-city').disabled = busy;
   $('#weather-form button').disabled = busy;
+  for (const button of document.querySelectorAll('#telegram-code, #telegram-cancel, #telegram-unlink, #telegram-refresh')) button.disabled = busy;
   for (const button of document.querySelectorAll('#logout, #refresh, #load-more, #retry, .device-button')) button.disabled = busy;
 }
 
 function loginView(text = '') {
+  clearTelegramCode();
   state.session = null;
   state.devices = [];
   state.selected = null;
@@ -61,7 +80,7 @@ function handleError(error, context = '') {
     if (context === 'login' && !state.session) message('Неверный логин или пароль.');
     else loginView('Сессия завершилась. Войдите снова.');
   } else if (error instanceof ApiError && error.status === 429) {
-    message('Слишком много попыток входа. Подождите минуту и повторите.');
+    message('Слишком много запросов. Подождите минуту и повторите.');
   } else if (error instanceof ApiError && error.status === 403) {
     message('Не удалось подтвердить действие. Обновите страницу и повторите.');
   } else if (error instanceof ApiError && error.status === 404) {
@@ -182,6 +201,8 @@ async function dashboard(session) {
   $('#devices-title').textContent = session.user.role === 'super_admin' ? 'Все устройства' : 'Мои устройства';
   const weatherPreference = await api.weatherPreference();
   $('#weather-city').value = weatherPreference.city;
+  clearTelegramCode();
+  await loadTelegramStatus();
   await loadDevices();
 }
 
@@ -195,6 +216,24 @@ async function bootstrap() {
 }
 
 $('#retry').addEventListener('click', () => run(bootstrap));
+$('#telegram-refresh').addEventListener('click', () => run(loadTelegramStatus));
+$('#telegram-code').addEventListener('click', () => run(async () => {
+  clearTelegramCode();
+  const result = await api.telegramCode(state.session.csrf_token);
+  if (!/^[A-Za-z0-9_-]{24}$/.test(result?.code) || result.expires_in !== 300) throw new ApiError(502, 'protocol');
+  $('#telegram-secret').textContent = `Отправьте боту: /link ${result.code}`;
+  $('#telegram-secret').hidden = false;
+  telegramCodeTimer = setTimeout(clearTelegramCode, result.expires_in * 1000);
+}));
+$('#telegram-cancel').addEventListener('click', () => run(async () => {
+  clearTelegramCode();
+  await api.cancelTelegramCode(state.session.csrf_token);
+  $('#telegram-status').textContent = 'Код отменён.';
+}));
+$('#telegram-unlink').addEventListener('click', () => {
+  if (!window.confirm('Отключить Telegram от этого аккаунта?')) return;
+  run(async () => { await api.unlinkTelegram(state.session.csrf_token); clearTelegramCode(); await loadTelegramStatus(); });
+});
 $('#login-form').addEventListener('submit', event => {
   event.preventDefault();
   if (state.busy) return;

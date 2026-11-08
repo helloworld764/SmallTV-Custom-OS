@@ -117,14 +117,19 @@ def set_weather_preference(payload: CityChange, request: FastAPIRequest,
                            principal: Annotated[Principal, Depends(write_user)]):
     match = geocode(payload.city, request.app.state.settings.weather_timeout_seconds)
     with request.app.state.database.transaction() as connection:
-        connection.execute("""INSERT INTO user_preferences
+        store_preference(connection, principal.user.id, match)
+    return {"city": match["name"], "timezone": match["timezone"], "country": match["country"]}
+
+
+def store_preference(connection, user_id, match):
+    """Shared domain write; callers must authorize the account before invoking."""
+    connection.execute("""INSERT INTO user_preferences
             (user_id, weather_city, weather_latitude, weather_longitude, weather_timezone)
             VALUES (?, ?, ?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET
             weather_city=excluded.weather_city, weather_latitude=excluded.weather_latitude,
             weather_longitude=excluded.weather_longitude, weather_timezone=excluded.weather_timezone,
             updated_at=strftime('%Y-%m-%dT%H:%M:%fZ', 'now')""",
-            (principal.user.id, match["name"], match["latitude"], match["longitude"], match["timezone"]))
-    return {"city": match["name"], "timezone": match["timezone"], "country": match["country"]}
+            (user_id, match["name"], match["latitude"], match["longitude"], match["timezone"]))
 
 
 @router.get("/weather")

@@ -1,0 +1,147 @@
+"""Explicit local polling process: python -m backend.app.bot_worker run."""
+
+import argparse
+from contextlib import contextmanager
+import json
+import os
+import re
+import time
+
+from .bot_handler import process_update
+from .bot_transport import TelegramClient, TelegramError
+from .config import Settings
+from .database import Database
+from .telegram import active_link
+
+
+@contextmanager
+def worker_lock(path):
+    """OS releases the non-blocking lock on exit/crash, Windows and Debian."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open('a+b') as handle:
+        handle.seek(0, 2)
+        if handle.tell() == 0:
+            handle.write(b'0')
+            handle.flush()
+        handle.seek(0)
+        if os.name == 'nt':
+            import msvcrt
+            msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        try:
+            yield
+        finally:
+            handle.seek(0)
+            if os.name == 'nt':
+                msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                fcntl.flock(handle, fcntl.LOCK_UN)
+
+
+def initialize_bot(database, client):
+    info = client.call('getMe')
+    webhook = client.call('getWebhookInfo')
+    if (not isinstance(info, dict) or info.get('is_bot') is not True
+            or type(info.get('id')) is not int or not 0 < info['id'] < 2**53):
+        raise ValueError('Invalid Telegram bot identity')
+    if not isinstance(webhook, dict) or webhook.get('url'):
+        raise ValueError('An existing webhook must be managed separately before polling')
+    with database.transaction() as connection:
+        row = connection.execute('SELECT bot_id FROM telegram_worker_state WHERE id=1').fetchone()
+        if row['bot_id'] not in (None, info['id']):
+            raise ValueError('This database is already associated with another Telegram bot')
+        connection.execute('UPDATE telegram_worker_state SET bot_id=? WHERE id=1', (info['id'],))
+
+
+def deliver_replies(database, client, now=None):
+    now = int(time.time()) if now is None else now
+    with database.connection() as connection:
+        rows = connection.execute('SELECT * FROM telegram_replies ORDER BY update_id LIMIT 20').fetchall()
+    for row in rows:
+        with database.connection() as connection:
+            link = active_link(connection, row['telegram_id'])
+            allowed = row['user_id'] is None or (link and link['user_id'] == row['user_id'])
+        if row['expires_at'] > now and allowed:
+            try:
+                client.call('sendMessage', {'chat_id': row['telegram_id'], 'text': row['text'],
+                                           'reply_markup': json.loads(row['markup'])})
+            except TelegramError as error:
+                if error.status not in (400, 403):
+                    raise
+                # Permanent delivery denial: disable future notification consent.
+                with database.transaction() as connection:
+                    connection.execute('UPDATE telegram_preferences SET enabled=0 WHERE user_id=?', (row['user_id'],))
+        with database.transaction() as connection:
+            connection.execute('DELETE FROM telegram_replies WHERE update_id=?', (row['update_id'],))
+
+
+def poll_once(database, settings, client):
+    deliver_replies(database, client)
+    with database.connection() as connection:
+        offset = connection.execute('SELECT next_offset FROM telegram_worker_state WHERE id=1').fetchone()[0]
+    updates = client.call('getUpdates', {'offset': offset, 'timeout': 25, 'limit': 20,
+                                        'allowed_updates': ['message', 'callback_query']})
+    if not isinstance(updates, list) or len(updates) > 20:
+        raise TelegramError()
+    for update in updates:
+        if not isinstance(update, dict) or type(update.get('update_id')) is not int or not 0 <= update['update_id'] < 2**53:
+            raise TelegramError()
+        callback = process_update(database, settings, update)
+        with database.transaction() as connection:
+            connection.execute('UPDATE telegram_worker_state SET next_offset=max(next_offset, ?) WHERE id=1', (update['update_id']+1,))
+        if callback:
+            try:
+                client.call('answerCallbackQuery', {'callback_query_id': callback})
+            except TelegramError:
+                pass
+    deliver_replies(database, client)
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description='Storm Bot local polling worker')
+    parser.add_argument('command', choices=('check', 'run'))
+    args = parser.parse_args(argv)
+    try:
+        settings = Settings()
+    except Exception:
+        print('Configuration is invalid. Check local settings; values are not printed.')
+        return 1
+    token = settings.telegram_bot_token.get_secret_value() if settings.telegram_bot_token else ''
+    valid = bool(re.fullmatch(r'[0-9]{5,20}:[A-Za-z0-9_-]{25,100}', token))
+    if args.command == 'check':
+        print(json.dumps({'token_configured': bool(token), 'token_format_valid': valid,
+                          'network_checked': False}))
+        return 0 if valid else 1
+    if not valid:
+        print('Set SMALLTV_TELEGRAM_BOT_TOKEN in the local .env; do not pass it as an argument.')
+        return 1
+    database = Database(settings.db_path)
+    database.initialize()
+    client = TelegramClient(token)
+    try:
+        with worker_lock(database.path.with_suffix('.telegram.lock')):
+            initialize_bot(database, client)
+            print('Storm Bot polling started. Press Ctrl+C to stop.')
+            delay = 1
+            while True:
+                try:
+                    poll_once(database, settings, client)
+                    delay = 1
+                except TelegramError as error:
+                    if error.status in (401, 409):
+                        print('Telegram rejected polling (authentication or competing worker). Stopped.')
+                        return 1
+                    delay = min(30, delay*2)
+                    time.sleep(max(delay, error.retry_after))
+    except KeyboardInterrupt:
+        print('Storm Bot stopped.')
+        return 0
+    except (OSError, TelegramError, ValueError):
+        print('Storm Bot could not start. Check connectivity, bot configuration and whether another worker is running.')
+        return 1
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())

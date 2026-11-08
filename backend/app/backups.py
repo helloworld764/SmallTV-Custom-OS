@@ -138,6 +138,10 @@ def _snapshot(source: Path, destination: Path, migrations: Path, timeout: float,
             restored.initialize()  # Upgrade only this new copy, never the source.
             with restored.transaction() as connection:
                 connection.execute('DELETE FROM auth_sessions')
+                connection.execute('DELETE FROM telegram_replies')
+                connection.execute('DELETE FROM telegram_links')
+                connection.execute('DELETE FROM telegram_link_codes')
+                connection.execute('UPDATE telegram_preferences SET enabled=0')
                 revoked_at = int(time.time())
                 connection.execute('UPDATE device_credentials SET revoked_at = ? WHERE revoked_at IS NULL', (revoked_at,))
                 connection.execute('UPDATE agent_credentials SET revoked_at = ? WHERE revoked_at IS NULL', (revoked_at,))

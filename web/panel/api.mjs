@@ -69,6 +69,16 @@ export class ApiClient {
     return value;
   }
   async weather() { return this.request('/api/v1/weather'); }
+  async telegramStatus() { return this.request('/api/v1/telegram/status'); }
+  async telegramCode(csrf) {
+    return this.request('/api/v1/telegram/link-code', { method: 'POST', headers: { 'X-CSRF-Token': csrf } });
+  }
+  async cancelTelegramCode(csrf) {
+    return this.request('/api/v1/telegram/link-code', { method: 'DELETE', headers: { 'X-CSRF-Token': csrf } });
+  }
+  async unlinkTelegram(csrf) {
+    return this.request('/api/v1/telegram/link', { method: 'DELETE', headers: { 'X-CSRF-Token': csrf } });
+  }
   async save(id, changes, csrf) {
     return settingsData(await this.request(`/api/v1/devices/${encodeURIComponent(id)}/settings`, {
       method: 'PATCH', body: changes, headers: { 'X-CSRF-Token': csrf },

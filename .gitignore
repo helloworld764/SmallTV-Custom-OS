@@ -24,6 +24,7 @@ credentials/
 *.pfx
 *.dpapi
 *.monitor.lock
+*.telegram.lock
 id_rsa*
 id_ed25519*
 tokens.json

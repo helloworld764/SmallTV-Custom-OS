@@ -7,6 +7,22 @@ const session = { user: { id: 'user-test', display_name: 'Test', role: 'user' },
 const settings = { device_id: 'device-test', brightness: 70, theme: 'BlackArch Red', start_screen: 'clock' };
 const reply = (value, status = 200) => ({ ok: status < 400, status, json: async () => value });
 
+test('Telegram linking uses private API calls with CSRF and never URL credentials', async () => {
+  const calls = [];
+  const client = new ApiClient({ fetcher: async (path, options) => {
+    calls.push([path, options.method, options.headers['X-CSRF-Token']]);
+    return reply({}, options.method === 'DELETE' ? 204 : 200);
+  } });
+  await client.telegramStatus();
+  await client.telegramCode(csrf);
+  await client.cancelTelegramCode(csrf);
+  await client.unlinkTelegram(csrf);
+  assert.deepEqual(calls, [
+    ['/api/v1/telegram/status', 'GET', undefined], ['/api/v1/telegram/link-code', 'POST', csrf],
+    ['/api/v1/telegram/link-code', 'DELETE', csrf], ['/api/v1/telegram/link', 'DELETE', csrf],
+  ]);
+});
+
 test('login uses JSON, same-origin cookies and the required client header', async () => {
   const client = new ApiClient({ fetcher: async (path, options) => {
     assert.equal(path, '/api/v1/auth/login');
