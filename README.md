@@ -268,6 +268,14 @@ backups/manual-copy.sqlite3`. При повторном запуске суще�
 Пароль не сохраняется в браузерном хранилище; CSRF-токен остаётся в памяти страницы.
 Краткая инструкция первого входа также доступна по `/panel/help.html`.
 
+Кнопка солнца/луны в правом верхнем углу переключает светлую/тёмную тему сайта:
+панели, справки и страницы симулятора. Выбор сохраняется в этом браузере и
+синхронизируется между открытыми вкладками. В localStorage хранится только
+настройка `storm.site-theme`; при запрете хранилища переключение работает до
+перезагрузки. Тема сайта не меняет сохранённую тему экрана устройства.
+Дополнения к плану питомцев, бота и оформления:
+[docs/functions-for-approval.md](docs/functions-for-approval.md).
+
 Для дополнительной ручной проверки API можно использовать `/docs`:
 
 1. В `POST /api/v1/auth/login` выберите Try it out, задайте заголовок
@@ -289,14 +297,14 @@ Windows:
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest
-node --test tests/simulator.test.mjs tests/panel.test.mjs tests/branding.test.mjs
+node --test tests/simulator.test.mjs tests/panel.test.mjs tests/branding.test.mjs tests/site-theme.test.mjs
 ```
 
 Debian:
 
 ```bash
 .venv/bin/python -m pytest
-node --test tests/simulator.test.mjs tests/panel.test.mjs tests/branding.test.mjs
+node --test tests/simulator.test.mjs tests/panel.test.mjs tests/branding.test.mjs tests/site-theme.test.mjs
 ```
 
 Node.js 20+ нужен только для JavaScript-тестов; симулятор работает в современном

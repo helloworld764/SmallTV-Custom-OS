@@ -90,4 +90,5 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.mount("/simulator", WebFiles(directory=simulator, html=True), name="simulator")
     panel = simulator.parent / "panel"
     app.mount("/panel", WebFiles(directory=panel, html=True), name="panel")
+    app.mount("/shared", WebFiles(directory=panel.parent / "shared"), name="shared")
     return app

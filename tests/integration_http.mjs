@@ -106,7 +106,7 @@ assert.equal((await client.request(runPath)).last_reported_state, 'DONE');
 await assert.rejects(client.request('/api/v1/agents/codex/heartbeat', {
   method: 'POST', body: {}, headers: agentAuth,
 }), error => error.status === 401);
-for (const path of ['/panel/', '/simulator/?device=integration-tv', '/simulator/preview.mjs', '/simulator/notifications.mjs']) {
+for (const path of ['/panel/', '/simulator/?device=integration-tv', '/simulator/preview.mjs', '/simulator/notifications.mjs', '/shared/site-theme.mjs', '/shared/site-theme.css']) {
   assert.equal((await fetcher(path)).status, 200);
 }
 await client.logout(session.csrf_token);

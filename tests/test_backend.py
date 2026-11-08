@@ -102,3 +102,18 @@ def test_panel_modules_override_windows_plaintext_mime(client, monkeypatch):
         response = client.get(f'/panel/{asset}')
         assert response.headers['content-type'] == 'text/javascript; charset=utf-8'
         assert response.headers['x-content-type-options'] == 'nosniff'
+
+
+def test_shared_site_theme_assets_and_page_controls_are_public_but_sources_are_private(client, monkeypatch):
+    mimetypes.init()
+    monkeypatch.setitem(mimetypes.types_map, '.mjs', 'text/plain')
+    for page in ('/panel/', '/panel/help.html', '/simulator/'):
+        response = client.get(page)
+        assert response.status_code == 200
+        assert 'data-site-theme-toggle' in response.text
+        assert '/shared/site-theme.css' in response.text and '/shared/site-theme.mjs' in response.text
+    module = client.get('/shared/site-theme.mjs')
+    assert module.status_code == 200 and module.headers['content-type'] == 'text/javascript; charset=utf-8'
+    assert client.get('/shared/site-theme.css').status_code == 200
+    assert client.get('/shared/.env').status_code == 404
+    assert client.get('/shared/%2e%2e/%2e%2e/backend/app/config.py').status_code == 404
