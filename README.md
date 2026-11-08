@@ -21,7 +21,7 @@ backend/migrations/  нумерованные SQL-миграции
 firmware/         описание будущего аппаратного компонента, без прошивки
 web/simulator/   HTML/CSS/JS симулятор, без сборщика и npm-зависимостей
 web/panel/       локальная веб-панель: вход, устройства и настройки
-codex-monitor/   диагностика CLI, автономный JSONL-парсер, описание будущего агента
+codex-monitor/   диагностика, парсер и локальный smoke-мост с outbox/heartbeat
 docs/            архитектура и границы первого этапа
 tests/           Python API/config и JavaScript connection tests
 ```
@@ -171,6 +171,11 @@ API чтения устройств и изменения настроек тр�
 `.\.venv\Scripts\python.exe codex-monitor/smoke_exec.py --run`;
 это уже задача Codex с использованием его обычных лимитов, не просто справка.
 Условия запуска и безопасный JSON-отчёт: [docs/exec-smoke.md](docs/exec-smoke.md).
+Локальная отправка нормализованных событий и heartbeat с устойчивой очередью
+и DPAPI-хранилищем ключа: [docs/local-monitor.md](docs/local-monitor.md).
+Это мост для одного smoke-запуска, без постоянного агента и подключения к Debian.
+Сначала проверить DPAPI без реального ключа:
+`.\.venv\Scripts\python.exe codex-monitor/local_monitor.py check-key-store`.
 
 Повторный запуск сохраняет записи и не повторяет применённые миграции.
 База в `data/`, журналы SQLite, `.env` и тестовые файлы исключены из Git.

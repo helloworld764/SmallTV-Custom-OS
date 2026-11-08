@@ -22,6 +22,7 @@ credentials/
 *.key
 *.p12
 *.pfx
+*.dpapi
 id_rsa*
 id_ed25519*
 tokens.json

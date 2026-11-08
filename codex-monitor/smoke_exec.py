@@ -61,7 +61,11 @@ def stop_process(process):
             pass
 
 
-def observe(command, cwd, timeout=120):
+class DeliveryHookError(Exception):
+    pass
+
+
+def observe(command, cwd, timeout=120, *, event_sink=None, tick=None):
     parser = ExecEvents()
     report = {'status': 'failed_start', 'real_run_checked': False, 'exit_code': None,
               'parser_outcome': 'UNKNOWN', 'parser_reason': None, 'answer_matches': False,
@@ -118,13 +122,22 @@ def observe(command, cwd, timeout=120):
         reader.start()
     deadline, size, pending = time.monotonic() + timeout, 0, b''
 
+    def emit(events):
+        if event_sink is not None:
+            try:
+                for event in events:
+                    event_sink(event.to_dict())
+            except Exception:
+                raise DeliveryHookError from None
+
     def consume(raw):
         try:
             line = raw.decode('utf-8')
-            parser.feed(line)
+            events = parser.feed(line)
             message = json.loads(line) if line.strip() else {}
         except (UnicodeError, ValueError, RecursionError):
             return False
+        emit(events)
         kind = message.get('type') if isinstance(message, dict) else None
         if isinstance(kind, str) and kind in KNOWN_TYPES:
             report['event_counts'][kind] += 1
@@ -137,6 +150,11 @@ def observe(command, cwd, timeout=120):
 
     try:
         while True:
+            if tick is not None:
+                try:
+                    tick()
+                except Exception:
+                    raise DeliveryHookError from None
             if reader_error.is_set():
                 report['status'] = 'stream_read_failed'
                 break
@@ -170,13 +188,15 @@ def observe(command, cwd, timeout=120):
                     report['status'] = 'parser_rejected'
                     break
                 process.wait(timeout=max(0.01, deadline - time.monotonic()))
-                parser.finish(process.returncode)
+                emit(parser.finish(process.returncode))
                 report['status'] = 'verified' if parser.outcome == 'DONE' and report['answer_matches'] else 'unexpected_result'
             break
     except subprocess.TimeoutExpired:
         report['status'] = 'timeout'
     except KeyboardInterrupt:
         report['status'] = 'cancelled'
+    except DeliveryHookError:
+        report['status'] = 'delivery_error'
     finally:
         if process.poll() is None:
             try:
@@ -203,7 +223,7 @@ def observe(command, cwd, timeout=120):
     return report
 
 
-def run_smoke():
+def run_smoke(*, event_sink=None, tick=None):
     diagnostic = probe_cli()
     base = {'status': diagnostic['status'], 'cli_version': diagnostic['cli_version'], 'real_run_checked': False}
     if diagnostic['status'] != 'manual_verification_required':
@@ -233,7 +253,11 @@ def run_smoke():
         command = [executable, 'exec', '--ignore-user-config', '--json', '--sandbox', 'read-only',
                    '--ephemeral', '--skip-git-repo-check']
         failure = check_arguments(command, workspace)
-        report = (base | failure) if failure else (observe([*command, PROMPT], workspace) | {'cli_version': base['cli_version']})
+        if failure:
+            report = base | failure
+        else:
+            options = {} if event_sink is None and tick is None else {'event_sink': event_sink, 'tick': tick}
+            report = observe([*command, PROMPT], workspace, **options) | {'cli_version': base['cli_version']}
     except OSError:
         report = base | {'status': 'runner_failed', 'real_run_checked': None}
     finally:
