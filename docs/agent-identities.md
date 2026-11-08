@@ -1,4 +1,4 @@
-# Storm OS — идентичности будущих Windows Codex Monitor
+# Storm OS — идентичности Windows Codex Monitor
 
 Реализованы серверная авторизация, heartbeat и журнал сообщений агента, а также
 явно запускаемый локальный read-only клиент [run-task](task-runner.md).

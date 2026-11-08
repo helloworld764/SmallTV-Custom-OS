@@ -157,23 +157,25 @@ API чтения устройств и изменения настроек тр�
 приём heartbeat и состояние связи UNKNOWN/ONLINE/STALE/OFFLINE по серверному времени.
 Сервер принимает упорядоченные события START/WORKING/DONE/ERROR/INTERRUPTED с run_id
 и защитой от повторов: [docs/codex-events.md](docs/codex-events.md). Это собственный
-протокол; сам Monitor и источник реальных событий Codex ещё не реализованы.
+протокол; явно запускаемый Windows-мост уже получает реальные события exec JSONL.
+Постоянное наблюдение за всеми интерактивными сессиями не реализовано.
 Пользовательские cookie, device-
 и agent-ключи не заменяют друг друга.
 
 Проверить доступность CLI в обычном Windows PowerShell можно без запуска заданий:
 `.\.venv\Scripts\python.exe codex-monitor/check_cli.py`. Утилита вызывает только
-`--version`/`exec --help` и выводит безопасный JSON-отчёт. Сам Windows Monitor пока
-не реализован. Исследование источника событий: [docs/codex-cli-research.md](docs/codex-cli-research.md).
+`--version`/`exec --help` и выводит безопасный JSON-отчёт. Эта диагностика сама
+не запускает мониторинг. Исследование источника событий: [docs/codex-cli-research.md](docs/codex-cli-research.md).
 Автономный парсер и его границы: [docs/exec-parser.md](docs/exec-parser.md).
-Он проверен на синтетических потоках и не запускает Codex/сетевую отправку.
+Сам модуль парсера не запускает Codex/сетевую отправку; обёртка использует его
+и для реальных явно запускаемых задач CLI 0.167.0.
 Один реальный тест в отдельной временной папке можно запустить через
 `.\.venv\Scripts\python.exe codex-monitor/smoke_exec.py --run`;
 это уже задача Codex с использованием его обычных лимитов, не просто справка.
 Условия запуска и безопасный JSON-отчёт: [docs/exec-smoke.md](docs/exec-smoke.md).
 Локальная отправка нормализованных событий и heartbeat с устойчивой очередью
 и DPAPI-хранилищем ключа: [docs/local-monitor.md](docs/local-monitor.md).
-Это мост для одного smoke-запуска, без постоянного агента и подключения к Debian.
+Мост поддерживает run-smoke и run-task, без постоянной службы и подключения к Debian.
 Добавлена обёртка для явно запускаемых read-only задач:
 `.\.venv\Scripts\python.exe codex-monitor/local_monitor.py run-task --cwd . --show-answer`.
 Задание вводится скрыто и передаётся в stdin, а не в аргументы или очередь.

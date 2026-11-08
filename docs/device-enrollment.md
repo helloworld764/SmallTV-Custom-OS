@@ -3,7 +3,8 @@
 Этап реализует backend-протокол и проверку отдельного клиента на Windows.
 Он не подтверждает модель, серийный номер, GPIO, прошивку или совместимость SmallTV.
 Мастер в Storm Control Panel и аппаратный Wi-Fi provisioning не добавлены.
-Сервисные credentials Windows-агента также пока не реализованы.
+Отдельные credentials Windows-агента описаны в [agent-identities.md](agent-identities.md);
+они не взаимозаменяемы с ключами устройства.
 
 ## Протокол
 
