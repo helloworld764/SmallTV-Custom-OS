@@ -22,9 +22,10 @@ test('only the three approved catalogue sprites are configured for public previe
 test('Tamagotchi uses most of the 240 by 240 display area', () => {
   const html = readFileSync(new URL('../web/simulator/index.html', import.meta.url), 'utf8');
   const css = readFileSync(new URL('../web/simulator/style.css', import.meta.url), 'utf8');
-  assert.match(html, /id="pet-art" width="208" height="146"/);
-  assert.match(css, /data-screen=tamagotchi\] #screen-content \{ height: 174px; margin-top: 4px;/);
-  assert.match(css, /#pet-art \{[^}]*width: 208px; height: 146px;/);
+  assert.match(html, /id="pet-art" width="230" height="166"/);
+  assert.match(css, /data-screen=tamagotchi\] #screen-content \{ width: calc\(100% \+ 22px\); height: 192px;/);
+  assert.match(css, /#pet-art \{[^}]*width: 230px; height: 166px;/);
+  assert.match(css, /#pet-content #pet-labels \{[^}]*bottom: 0;/);
 });
 
 test('accepted pet actions select their corresponding short-lived reaction frames', () => {
