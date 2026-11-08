@@ -1,0 +1,125 @@
+import importlib.util
+import json
+from pathlib import Path
+import sys
+from types import SimpleNamespace
+
+import pytest
+
+
+@pytest.fixture
+def smoke(monkeypatch):
+    folder = Path(__file__).resolve().parents[1] / 'codex-monitor'
+    monkeypatch.syspath_prepend(str(folder))
+    spec = importlib.util.spec_from_file_location('storm_smoke_exec', folder / 'smoke_exec.py')
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def fake_command(lines, code=0):
+    # Runs only a local Python fixture, never Codex or a model.
+    text = '\n'.join(json.dumps(line) if isinstance(line, dict) else line for line in lines) + '\n'
+    return [sys.executable, '-c', f'import sys; sys.stdout.write({text!r}); sys.stderr.write("private stderr"); sys.exit({code})']
+
+
+def success_lines():
+    return [{'type': 'thread.started', 'thread_id': 'synthetic-thread'}, {'type': 'turn.started'},
+            {'type': 'item.completed', 'item': {'id': 'synthetic-item', 'type': 'agent_message', 'text': 'STORM_OK'}},
+            {'type': 'turn.completed', 'usage': {'input_tokens': 1, 'cached_input_tokens': 0, 'output_tokens': 1}}]
+
+
+def test_local_fixture_process_integrates_with_parser_and_discards_streams(smoke, tmp_path):
+    result = smoke.observe(fake_command(success_lines()), tmp_path, timeout=5)
+    assert result['status'] == 'verified' and result['parser_outcome'] == 'DONE'
+    assert result['answer_matches'] is True and result['stderr_present'] is True
+    assert result['event_counts']['turn.completed'] == 1
+    assert 'private' not in json.dumps(result) and 'synthetic-thread' not in json.dumps(result)
+
+
+@pytest.mark.parametrize('lines,code,status', [
+    ([{'type': 'turn.started'}], 0, 'unexpected_result'),
+    (success_lines(), 1, 'unexpected_result'),
+    (['not json private text'], 0, 'parser_rejected'),
+    ([{'type': 'unrecognized-private-type'}], 0, 'parser_rejected'),
+])
+def test_bad_real_process_streams_are_not_verified(smoke, tmp_path, lines, code, status):
+    result = smoke.observe(fake_command(lines, code), tmp_path, timeout=5)
+    assert result['status'] == status and 'private' not in json.dumps(result)
+
+
+def test_timeout_terminates_only_fixture_process(smoke, tmp_path):
+    result = smoke.observe([sys.executable, '-c', 'import time; time.sleep(30)'], tmp_path, timeout=0.2)
+    assert result['status'] == 'timeout' and result['exit_code'] is not None
+    assert result['parser_outcome'] == 'UNKNOWN'
+
+
+def test_output_limit_stops_fixture_without_printing_it(smoke, tmp_path, monkeypatch):
+    monkeypatch.setattr(smoke, 'MAX_STREAM_BYTES', 100)
+    result = smoke.observe([sys.executable, '-c', 'print("private" * 1000)'], tmp_path, timeout=5)
+    assert result['status'] == 'output_limit' and 'private' not in json.dumps(result)
+
+
+def test_missing_cli_does_not_start_model(smoke, monkeypatch):
+    monkeypatch.setattr(smoke, 'probe_cli', lambda: {'status': 'not_found', 'cli_version': None})
+    monkeypatch.setattr(smoke, 'observe', lambda *a, **k: pytest.fail('No exec allowed'))
+    assert smoke.run_smoke() == {'status': 'not_found', 'cli_version': None, 'real_run_checked': False}
+
+
+def prepare_profile(smoke, monkeypatch, tmp_path, help_text):
+    monkeypatch.setattr(smoke, 'probe_cli', lambda: {'status': 'manual_verification_required', 'cli_version': '0.0.0-test'})
+    monkeypatch.setattr(smoke.shutil, 'which', lambda name: 'fixture-cli')
+    monkeypatch.setattr(smoke.subprocess, 'run', lambda *a, **k: SimpleNamespace(returncode=0, stdout=help_text))
+    fake_source = tmp_path / 'repo' / 'codex-monitor' / 'smoke_exec.py'
+    fake_source.parent.mkdir(parents=True)
+    monkeypatch.setattr(smoke, '__file__', str(fake_source))
+    temporary = tmp_path / 'system-temp'
+    temporary.mkdir()
+    monkeypatch.setattr(smoke.tempfile, 'gettempdir', lambda: str(temporary))
+    return fake_source.parents[1]
+
+
+def test_unsupported_safety_flags_prevent_any_exec(smoke, monkeypatch, tmp_path):
+    prepare_profile(smoke, monkeypatch, tmp_path, '--ephemeral --skip-git-repo-check')
+    monkeypatch.setattr(smoke, 'observe', lambda *a, **k: pytest.fail('No exec allowed'))
+    assert smoke.run_smoke()['status'] == 'unsupported_smoke_profile'
+
+
+def test_single_exec_uses_empty_workspace_and_fixed_safe_arguments(smoke, monkeypatch, tmp_path):
+    root = prepare_profile(smoke, monkeypatch, tmp_path, '--ignore-user-config --ephemeral --skip-git-repo-check')
+    sentinel = root / 'keep.txt'
+    sentinel.write_text('keep', encoding='utf-8')
+    calls = []
+    def observe(command, cwd):
+        assert list(cwd.iterdir()) == []
+        assert cwd.parent == tmp_path / 'system-temp'
+        assert command == ['fixture-cli', '--ignore-user-config', 'exec', '--json', '--sandbox', 'read-only',
+                           '--ephemeral', '--skip-git-repo-check', smoke.PROMPT]
+        calls.append(cwd)
+        return {'status': 'verified', 'real_run_checked': True}
+    monkeypatch.setattr(smoke, 'observe', observe)
+    assert smoke.run_smoke()['status'] == 'verified'
+    assert len(calls) == 1 and not calls[0].exists()
+    assert sentinel.read_text(encoding='utf-8') == 'keep'
+
+
+def test_cli_requires_explicit_run_and_never_echoes_os_error(smoke, monkeypatch, capsys):
+    def fail():
+        raise PermissionError('private error')
+    monkeypatch.setattr(smoke, 'run_smoke', fail)
+    assert smoke.main([]) == 1
+    assert json.loads(capsys.readouterr().out)['status'] == 'requires_run_flag'
+    assert smoke.main(['--run']) == 1
+    result = capsys.readouterr().out
+    assert json.loads(result)['status'] == 'runner_failed' and 'private' not in result
+
+
+def test_cleanup_failure_cannot_claim_verified_or_hide_actual_attempt(smoke, monkeypatch, tmp_path):
+    prepare_profile(smoke, monkeypatch, tmp_path, '--ignore-user-config --ephemeral --skip-git-repo-check')
+    monkeypatch.setattr(smoke, 'observe', lambda *a: {'status': 'verified', 'real_run_checked': True})
+    def refuse_cleanup(*args, **kwargs):
+        raise PermissionError('private path')
+    monkeypatch.setattr(smoke.shutil, 'rmtree', refuse_cleanup)
+    result = smoke.run_smoke()
+    assert result['status'] == 'cleanup_failed' and result['real_run_checked'] is True
+    assert 'private' not in json.dumps(result)
