@@ -189,6 +189,11 @@ class FakeTelegram:
         if method=='getWebhookInfo': return {'url':''}
         if method=='getUpdates': return self.updates
         return True
+    def send_photo(self,payload,path):
+        self.calls.append(('sendPhoto',payload))
+        if self.failure: raise self.failure
+        assert path.is_file()
+        return True
 
 
 def test_worker_offsets_delivery_and_retries_do_not_reapply_mutations(env):
@@ -272,3 +277,169 @@ def test_transport_does_not_leak_token_in_exceptions(http_code):
     with pytest.raises(TelegramError) as error: client.call('getMe')
     assert token not in str(error.value) and token not in repr(error.value)
     assert error.value.status==http_code and error.value.retry_after==12
+
+
+def pet_button(reply,label):
+    for row in json.loads(reply['markup'])['inline_keyboard']:
+        for button in row:
+            if button['text']==label: return button['callback_data']
+    raise AssertionError('Pet button not found: '+label)
+
+
+def adopt_in_bot(env,now,kind='Pixel',name='Мурка'):
+    apply(env,'pet-create',callback=True,now=now)
+    apply(env,'petkind:'+kind,callback=True,now=now)
+    return apply(env,name,now=now)[1]
+
+
+def test_bot_adoption_card_api_and_simulator_share_one_profile(env,monkeypatch):
+    from backend.app import pets
+    link(env); now=int(time.time()); monkeypatch.setattr(pets,'now',lambda:now)
+    reply=adopt_in_bot(env,now)
+    assert reply['photo_asset']=='Pixel-happy' and 'Мурка' in reply['text']
+    data=env['api'].get('/api/v1/pets/current').json()
+    assert data['name']=='Мурка' and data['satiety']==80 and data['round']==1
+    assert data['reaction']['kind']=='ADOPT'
+    client=FakeTelegram(); deliver_replies(env['db'],client,now)
+    assert any(method=='sendPhoto' and 'Мурка' in payload['caption'] for method,payload in client.calls)
+
+
+def test_bot_name_validation_cancel_expiry_and_no_null(env):
+    link(env); now=int(time.time())
+    _,reply=apply(env,'petkind:Null',callback=True,now=now)
+    assert reply['photo_asset'] is None
+    apply(env,'petkind:Byte',callback=True,now=now)
+    _,reply=apply(env,'\u200b',now=now)
+    assert 'Имя должно' in reply['text']
+    _,reply=apply(env,'Valid name',now=now+301)
+    assert 'истекло' in reply['text']
+    assert env['api'].get('/api/v1/pets/current').status_code==404
+    apply(env,'petkind:Glitch',callback=True,now=now)
+    apply(env,'Настройки',now=now)
+    apply(env,'Accidental text',now=now)
+    assert env['api'].get('/api/v1/pets/current').status_code==404
+
+
+def test_care_changes_once_and_receipt_reaction_reaches_api(env,monkeypatch):
+    from backend.app import pets
+    link(env); now=int(time.time()); monkeypatch.setattr(pets,'now',lambda:now)
+    reply=adopt_in_bot(env,now)
+    button=pet_button(reply,'Кормить')
+    update,reply=apply(env,button,callback=True,now=now)
+    assert reply['photo_asset']=='Pixel-eating'
+    data=env['api'].get('/api/v1/pets/current').json()
+    assert data['satiety']==100 and data['reaction']['kind']=='FEED'
+    process_update(env['db'],env['settings'],update,now=now)
+    _,duplicate=apply(env,button,callback=True,now=now)
+    assert 'уже было выполнено' in duplicate['text']
+    with env['db'].connection() as c:
+        assert c.execute('SELECT count(*) FROM pet_actions').fetchone()[0]==1
+
+
+def test_sleep_stale_feed_wake_and_cooldown_are_shared_rules(env):
+    link(env); now=int(time.time())
+    reply=adopt_in_bot(env,now)
+    old_feed=pet_button(reply,'Кормить')
+    _,sleeping=apply(env,pet_button(reply,'Спать'),callback=True,now=now)
+    assert sleeping['photo_asset']=='Pixel-sleeping'
+    _,blocked=apply(env,old_feed,callback=True,now=now)
+    assert 'Сначала разбудите' in blocked['text']
+    wake=pet_button(sleeping,'Разбудить')
+    _,blocked=apply(env,wake,callback=True,now=now+1)
+    assert 'Подождите 9 сек.' in blocked['text']
+    _,awake=apply(env,wake,callback=True,now=now+10)
+    assert awake['photo_asset']=='Pixel-waking'
+    _,fed=apply(env,pet_button(awake,'Кормить'),callback=True,now=now+10)
+    _,blocked=apply(env,pet_button(fed,'Кормить'),callback=True,now=now+11)
+    assert 'Подождите 59 сек.' in blocked['text']
+
+
+def test_play_and_expired_keyboard_do_not_bypass_time_rules(env):
+    link(env); now=int(time.time())
+    reply=adopt_in_bot(env,now)
+    button=pet_button(reply,'Играть')
+    _,played=apply(env,button,callback=True,now=now)
+    assert played['photo_asset']=='Pixel-playing' and '70/100' in played['text']
+    _,expired=apply(env,pet_button(played,'Играть'),callback=True,now=now+301)
+    assert 'устарела' in expired['text']
+    with env['db'].connection() as c: assert c.execute('SELECT count(*) FROM pet_actions').fetchone()[0]==1
+
+
+def test_pet_callbacks_cannot_access_another_owner(env):
+    from backend.app import pets
+    link(env); now=int(time.time())
+    reply=adopt_in_bot(env,now)
+    with env['db'].transaction() as c:
+        c.execute('INSERT INTO telegram_links(telegram_id,user_id,linked_at) VALUES (202,?,?)',(env['other'],now))
+        pets.adopt_owned(c,env['other'],pets.Adopt(kind='Byte',name='Other pet'),now)
+    _,denied=apply(env,pet_button(reply,'Кормить'),who=202,callback=True,now=now)
+    assert 'Other pet' in denied['text'] and 'Мурка' not in denied['text']
+    with env['db'].connection() as c:
+        assert c.execute('SELECT count(*) FROM pet_actions').fetchone()[0]==0
+
+
+def test_missing_countdown_and_return_require_confirmation_no_reset_by_adoption(env):
+    link(env); now=int(time.time()); adopt_in_bot(env,now)
+    with env['db'].transaction() as c:
+        c.execute('UPDATE pet_states SET last_care_at=?',(now-72*3600,))
+    _,missing=apply(env,'/pet',now=now)
+    assert '24 ч 0 мин' in missing['text'] and 'Вернуть' not in missing['markup']
+    _,existing=apply(env,'petkind:Glitch',callback=True,now=now)
+    assert 'уже создан' in existing['text']
+    later=now+24*3600
+    _,ready=apply(env,'/pet',now=later)
+    confirm=pet_button(ready,'Вернуть')
+    token=confirm.split(':')[1]
+    _,denied=apply(env,'pact:'+token,callback=True,now=later)
+    assert 'сначала' in denied['text']
+    _,question=apply(env,confirm,callback=True,now=later)
+    old_yes=pet_button(question,'Да, вернуть')
+    _,cancelled=apply(env,'pet-cancel',callback=True,now=later)
+    _,stale=apply(env,old_yes,callback=True,now=later)
+    assert 'устарела' in stale['text']
+    _,question=apply(env,pet_button(cancelled,'Вернуть'),callback=True,now=later)
+    _,returned=apply(env,pet_button(question,'Да, вернуть'),callback=True,now=later)
+    assert returned['photo_asset']=='Pixel-happy' and '80/100' in returned['text']
+    apply(env,pet_button(question,'Да, вернуть'),callback=True,now=later)
+    with env['db'].connection() as c:
+        assert c.execute('SELECT round FROM pet_states').fetchone()[0]==2
+        assert c.execute('SELECT kind,name FROM pets').fetchone()[:]==('Pixel','Мурка')
+        assert c.execute('SELECT count(*) FROM pet_actions').fetchone()[0]==1
+
+
+def test_menu_refresh_is_read_only_for_pet_state(env):
+    link(env); now=int(time.time()); adopt_in_bot(env,now)
+    with env['db'].connection() as c: before=tuple(c.execute('SELECT * FROM pet_states').fetchone())
+    for _ in range(3): apply(env,'/pet',now=now+120)
+    with env['db'].connection() as c:
+        assert tuple(c.execute('SELECT * FROM pet_states').fetchone())==before
+        assert c.execute('SELECT count(*) FROM pet_actions').fetchone()[0]==0
+
+
+def test_pet_media_is_catalogue_only_and_photos_upload_as_multipart(env):
+    from backend.app.bot_pets import photo_path
+    assert photo_path('Null-neutral') is None and photo_path('../../.env') is None
+    client=TelegramClient('synthetic-token')
+    class Response:
+        def __enter__(self): return self
+        def __exit__(self,*args): pass
+        def read(self,limit): return b'{"ok":true,"result":{"message_id":1}}'
+    class Opener:
+        def open(self,request,timeout):
+            assert request.full_url.endswith('/sendPhoto')
+            assert request.headers['Content-type'].startswith('multipart/form-data; boundary=')
+            assert b'name="photo"; filename="pet.png"' in request.data
+            assert b'\x89PNG\r\n\x1a\n' in request.data
+            return Response()
+    client._opener=Opener()
+    assert client.send_photo({'chat_id':101,'caption':'Pet card','reply_markup':{}},photo_path('Pixel-neutral'))=={'message_id':1}
+
+
+def test_unlink_clears_pet_drafts_and_action_intents(env):
+    link(env); now=int(time.time()); reply=adopt_in_bot(env,now)
+    assert env['api'].delete('/api/v1/telegram/link',headers=env['csrf']).status_code==204
+    with env['db'].connection() as c:
+        assert c.execute('SELECT count(*) FROM telegram_pet_drafts').fetchone()[0]==0
+        assert c.execute('SELECT count(*) FROM telegram_pet_intents').fetchone()[0]==0
+    _,denied=apply(env,pet_button(reply,'Кормить'),callback=True,now=now)
+    assert denied['photo_asset'] is None

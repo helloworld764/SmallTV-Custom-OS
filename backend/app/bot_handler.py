@@ -7,7 +7,7 @@ import time
 from fastapi import HTTPException
 from pydantic import ValidationError
 
-from . import weather
+from . import weather, bot_pets
 from .security import token_hash
 from .telegram import CATEGORIES, active_link, preferences, throttle, unlink
 
@@ -25,6 +25,8 @@ def identity(update):
     if not isinstance(update, dict) or type(update.get('update_id')) is not int or not 0 <= update['update_id'] < 2**53:
         return None
     callback = update.get('callback_query')
+    if isinstance(callback, dict) and (not isinstance(callback.get('id'),str) or not 0 < len(callback['id']) <= 256):
+        return None
     message = callback.get('message') if isinstance(callback, dict) else update.get('message')
     sender = callback.get('from') if isinstance(callback, dict) else message.get('from') if isinstance(message, dict) else None
     if not isinstance(message, dict) or not isinstance(sender, dict):
@@ -96,7 +98,11 @@ def process_update(database, settings, update, now=None):
             else:
                 reply = city_error
             markup = MENU
+        elif bot_pets.is_pet_input(connection, link, text, bool(callback_id)):
+            connection.execute("UPDATE telegram_links SET input_mode='' WHERE telegram_id=?", (who,))
+            reply, markup = bot_pets.handle(connection, link, text, now, bool(callback_id))
         else:
+            connection.execute('DELETE FROM telegram_pet_drafts WHERE telegram_id=?', (who,))
             reply, markup = dispatch(connection, link, text, now)
             if text == 'unlink':
                 uid = None
@@ -105,8 +111,10 @@ def process_update(database, settings, update, now=None):
         count = connection.execute('SELECT count(*) FROM telegram_replies WHERE telegram_id=?', (who,)).fetchone()[0]
         if count >= 10:
             connection.execute('DELETE FROM telegram_replies WHERE update_id=(SELECT min(update_id) FROM telegram_replies WHERE telegram_id=?)', (who,))
-        connection.execute('INSERT INTO telegram_replies VALUES (?, ?, ?, ?, ?, ?)',
-                           (update['update_id'], who, uid, reply, json.dumps(markup, ensure_ascii=False), now+300))
+        photo = markup.pop('_storm_photo', None)
+        connection.execute('''INSERT INTO telegram_replies
+            (update_id,telegram_id,user_id,text,markup,expires_at,photo_asset) VALUES (?,?,?,?,?,?,?)''',
+            (update['update_id'],who,uid,reply,json.dumps(markup,ensure_ascii=False),now+300,photo))
     return callback_id
 
 
@@ -168,7 +176,4 @@ def dispatch(connection, link, text, now):
     if text == 'unlink':
         unlink(connection, uid)
         return 'Связь отключена. Для повторного подключения получите новый код в панели.', MENU
-    if text in ('Питомец', '/pet'):
-        pet = connection.execute('SELECT name FROM pets WHERE owner_id=?', (uid,)).fetchone()
-        return (f'Ваш питомец: {pet["name"]}. ' if pet else 'Питомец ещё не создан. ')+'Просмотр показателей и кнопки ухода появятся следующим этапом.', MENU
     return 'Storm Bot работает в личном чате. Привязка: код в разделе Telegram веб-панели → /link код сюда. Настройки: город и категории уведомлений. Физическое устройство пока не подключается через бота; код на SmallTV потребует прошивки. Пароль от аккаунта боту не нужен.', MENU

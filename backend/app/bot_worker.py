@@ -8,6 +8,7 @@ import re
 import time
 
 from .bot_handler import process_update
+from .bot_pets import photo_path
 from .bot_transport import TelegramClient, TelegramError
 from .config import Settings
 from .database import Database
@@ -65,8 +66,12 @@ def deliver_replies(database, client, now=None):
             allowed = row['user_id'] is None or (link and link['user_id'] == row['user_id'])
         if row['expires_at'] > now and allowed:
             try:
-                client.call('sendMessage', {'chat_id': row['telegram_id'], 'text': row['text'],
-                                           'reply_markup': json.loads(row['markup'])})
+                photo = photo_path(row['photo_asset'])
+                markup = json.loads(row['markup'])
+                if photo and photo.is_file():
+                    client.send_photo({'chat_id': row['telegram_id'], 'caption': row['text'], 'reply_markup': markup}, photo)
+                else:
+                    client.call('sendMessage', {'chat_id': row['telegram_id'], 'text': row['text'], 'reply_markup': markup})
             except TelegramError as error:
                 if error.status not in (400, 403):
                     raise

@@ -1,4 +1,4 @@
-"""Initial owner-only pet API. No media upload, bot, social access or hardware."""
+"""Owner-only pet API and shared domain writes. No social access or hardware."""
 
 from typing import Annotated, Literal
 import unicodedata
@@ -124,18 +124,23 @@ def catalog(principal: Annotated[Principal, Depends(current_user)]):
 
 @router.post('', response_model=PetView, status_code=201)
 def adopt(payload: Adopt, request: Request, principal: Annotated[Principal, Depends(write_user)]):
-    identifier, timestamp = str(uuid4()), now()
     with request.app.state.database.transaction() as connection:
         require_live_session(connection, principal)
-        if connection.execute('SELECT 1 FROM pets WHERE owner_id = ?', (principal.user.id,)).fetchone():
-            raise HTTPException(409, 'A pet already exists; adoption cannot reset its lifecycle')
-        connection.execute('INSERT INTO pets VALUES (?, ?, ?, ?, ?)',
-                           (identifier, principal.user.id, payload.kind, payload.name, timestamp))
-        connection.execute('''INSERT INTO pet_states
-            (pet_id, satiety, energy, mood, sleeping, updated_at, last_care_at, round,
-             reaction_id, reaction_kind, reaction_at) VALUES (?, ?, ?, ?, 0, ?, ?, 1, ?, 'ADOPT', ?)''',
-            (identifier, engine.INITIAL, engine.INITIAL, engine.INITIAL, timestamp, timestamp, 'adopt:' + identifier, timestamp))
-        return view(find_pet(connection, principal.user.id), timestamp)
+        return adopt_owned(connection, principal.user.id, payload, now())
+
+
+def adopt_owned(connection, owner_id, payload, timestamp):
+    """Domain write shared by authorized adapters within their transaction."""
+    identifier = str(uuid4())
+    if connection.execute('SELECT 1 FROM pets WHERE owner_id = ?', (owner_id,)).fetchone():
+        raise HTTPException(409, 'A pet already exists; adoption cannot reset its lifecycle')
+    connection.execute('INSERT INTO pets VALUES (?, ?, ?, ?, ?)',
+                       (identifier, owner_id, payload.kind, payload.name, timestamp))
+    connection.execute('''INSERT INTO pet_states
+        (pet_id, satiety, energy, mood, sleeping, updated_at, last_care_at, round,
+         reaction_id, reaction_kind, reaction_at) VALUES (?, ?, ?, ?, 0, ?, ?, 1, ?, 'ADOPT', ?)''',
+        (identifier, engine.INITIAL, engine.INITIAL, engine.INITIAL, timestamp, timestamp, 'adopt:' + identifier, timestamp))
+    return view(find_pet(connection, owner_id), timestamp)
 
 
 @router.get('/current', response_model=PetView)
@@ -148,33 +153,40 @@ def current(request: Request, principal: Annotated[Principal, Depends(current_us
 @router.post('/{pet_id}/actions', response_model=ActionReceipt, status_code=201)
 def act(pet_id: UUID, payload: PetAction, request: Request, response: Response,
         principal: Annotated[Principal, Depends(write_user)]):
-    identifier, timestamp = str(payload.action_id), now()
     with request.app.state.database.transaction() as connection:
         require_live_session(connection, principal)
-        row = find_pet(connection, principal.user.id, str(pet_id))
-        previous = connection.execute('SELECT * FROM pet_actions WHERE pet_id = ? AND action_id = ?',
-                                      (str(pet_id), identifier)).fetchone()
-        if previous:
-            if (previous['action'], bool(previous['confirmed'])) != (payload.action, payload.confirm_restart):
-                raise HTTPException(409, 'Action identifier already used with different content')
+        receipt = act_owned(connection, principal.user.id, str(pet_id), payload, now())
+        if receipt.duplicate:
             response.status_code = 200
-            return ActionReceipt(action_id=identifier, pet_id=str(pet_id), action=payload.action, duplicate=True,
-                                 applied_at=previous['applied_at'], round=previous['round'], reaction=None)
-        if connection.execute('SELECT COUNT(*) FROM pet_actions WHERE pet_id = ?', (str(pet_id),)).fetchone()[0] >= MAX_ACTIONS:
-            raise HTTPException(429, 'Pet action history limit reached; operator review required')
-        try:
-            state = engine.apply(row, payload.action, timestamp)
-        except engine.GameError as error:
-            if error.retry_after is not None:
-                raise HTTPException(429, str(error), headers={'Retry-After': str(error.retry_after)}) from None
-            raise HTTPException(409, str(error)) from None
-        connection.execute('''UPDATE pet_states SET satiety=?, energy=?, mood=?, sleeping=?, updated_at=?,
-            last_care_at=?, round=?, feed_at=?, play_at=?, sleep_at=?, reaction_id=?, reaction_kind=?, reaction_at=?
-            WHERE pet_id=?''', tuple(state[key] for key in
-                ('satiety', 'energy', 'mood', 'sleeping', 'updated_at', 'last_care_at', 'round', 'feed_at', 'play_at', 'sleep_at'))
-                + (identifier, payload.action.upper(), timestamp, str(pet_id)))
-        connection.execute('INSERT INTO pet_actions VALUES (?, ?, ?, ?, ?, ?)',
-                           (str(pet_id), identifier, payload.action, int(payload.confirm_restart), timestamp, state['round']))
-        return ActionReceipt(action_id=identifier, pet_id=str(pet_id), action=payload.action, duplicate=False,
-                             applied_at=timestamp, round=state['round'],
-                             reaction=Reaction(id=identifier, kind=payload.action.upper(), expires_at=timestamp + engine.REACTION_TTL_SECONDS))
+        return receipt
+
+
+def act_owned(connection, owner_id, pet_id, payload, timestamp):
+    """Apply an authorized owner's action without coupling to cookie sessions."""
+    identifier = str(payload.action_id)
+    row = find_pet(connection, owner_id, pet_id)
+    previous = connection.execute('SELECT * FROM pet_actions WHERE pet_id = ? AND action_id = ?',
+                                  (pet_id, identifier)).fetchone()
+    if previous:
+        if (previous['action'], bool(previous['confirmed'])) != (payload.action, payload.confirm_restart):
+            raise HTTPException(409, 'Action identifier already used with different content')
+        return ActionReceipt(action_id=identifier, pet_id=pet_id, action=payload.action, duplicate=True,
+                             applied_at=previous['applied_at'], round=previous['round'], reaction=None)
+    if connection.execute('SELECT COUNT(*) FROM pet_actions WHERE pet_id = ?', (pet_id,)).fetchone()[0] >= MAX_ACTIONS:
+        raise HTTPException(429, 'Pet action history limit reached; operator review required')
+    try:
+        state = engine.apply(row, payload.action, timestamp)
+    except engine.GameError as error:
+        if error.retry_after is not None:
+            raise HTTPException(429, str(error), headers={'Retry-After': str(error.retry_after)}) from None
+        raise HTTPException(409, str(error)) from None
+    connection.execute('''UPDATE pet_states SET satiety=?, energy=?, mood=?, sleeping=?, updated_at=?,
+        last_care_at=?, round=?, feed_at=?, play_at=?, sleep_at=?, reaction_id=?, reaction_kind=?, reaction_at=?
+        WHERE pet_id=?''', tuple(state[key] for key in
+            ('satiety', 'energy', 'mood', 'sleeping', 'updated_at', 'last_care_at', 'round', 'feed_at', 'play_at', 'sleep_at'))
+            + (identifier, payload.action.upper(), timestamp, pet_id))
+    connection.execute('INSERT INTO pet_actions VALUES (?, ?, ?, ?, ?, ?)',
+                       (pet_id, identifier, payload.action, int(payload.confirm_restart), timestamp, state['round']))
+    return ActionReceipt(action_id=identifier, pet_id=pet_id, action=payload.action, duplicate=False,
+                         applied_at=timestamp, round=state['round'],
+                         reaction=Reaction(id=identifier, kind=payload.action.upper(), expires_at=timestamp + engine.REACTION_TTL_SECONDS))

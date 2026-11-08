@@ -69,6 +69,8 @@ def cancel_code(request: Request, principal: Annotated[Principal, Depends(write_
 
 def unlink(connection, user_id):
     connection.execute('DELETE FROM telegram_replies WHERE user_id=?', (user_id,))
+    connection.execute('DELETE FROM telegram_pet_drafts WHERE user_id=?', (user_id,))
+    connection.execute('DELETE FROM telegram_pet_intents WHERE user_id=?', (user_id,))
     connection.execute('DELETE FROM telegram_links WHERE user_id=?', (user_id,))
     connection.execute('DELETE FROM telegram_link_codes WHERE user_id=?', (user_id,))
     connection.execute('UPDATE telegram_preferences SET enabled=0 WHERE user_id=?', (user_id,))

@@ -16,6 +16,26 @@ MANIFEST = json.loads((ROOT / 'manifest.json').read_text(encoding='utf-8'))
 SIMULATOR_PETS = Path(__file__).resolve().parents[1] / 'web' / 'simulator' / 'pets'
 
 
+def test_bot_thumbnails_are_complete_catalogue_without_metadata_or_private_characters():
+    from backend.app.bot_pets import KINDS, STATES, photo_path
+    manifest=json.loads((SIMULATOR_PETS/'bot'/'manifest.json').read_text(encoding='utf-8'))
+    expected={f'{kind}-{state}.png' for kind in KINDS for state in STATES}
+    assert set(manifest['files'])==expected
+    assert {path.name for path in (SIMULATOR_PETS/'bot').glob('*.png')}==expected
+    for kind in KINDS:
+        assert hashlib.sha256((SIMULATOR_PETS/(kind+'-states.png')).read_bytes()).hexdigest()==manifest['sources'][kind]
+    for name,checksum in manifest['files'].items():
+        data=photo_path(name[:-4]).read_bytes()
+        assert hashlib.sha256(data).hexdigest()==checksum
+        assert len(data)<1048576 and struct.unpack('>II',data[16:24])==(320,320)
+        offset=8
+        while offset<len(data):
+            length=int.from_bytes(data[offset:offset+4],'big')
+            kind=data[offset+4:offset+8]
+            assert kind in (b'IHDR',b'IDAT',b'IEND')
+            offset+=length+12
+
+
 def verify_png(record):
     relative = PurePosixPath(record['file'])
     assert not relative.is_absolute() and '..' not in relative.parts and '\\' not in record['file']
