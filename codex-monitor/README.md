@@ -1,8 +1,13 @@
 # Windows Codex Monitor для Storm OS
 
 Добавлены диагностика CLI, парсер и ограниченный локальный мост smoke → outbox →
-HTTP с heartbeat и Windows DPAPI для ключа. Постоянного Monitor произвольных или
-интерактивных задач пока нет. Codex на Debian не переносится.
+HTTP с heartbeat и Windows DPAPI для ключа. Есть `run-task` для новых явно
+запускаемых read-only задач; постоянного Monitor всех/интерактивных сессий нет.
+Codex на Debian не переносится. [Инструкция run-task](../docs/task-runner.md).
+
+```powershell
+.\.venv\Scripts\python.exe codex-monitor/local_monitor.py run-task --cwd . --show-answer
+```
 Инструкция: [local-monitor.md](../docs/local-monitor.md).
 
 Сначала проверить хранилище без реального ключа:

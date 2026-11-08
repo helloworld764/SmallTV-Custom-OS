@@ -466,3 +466,38 @@ JSONL, не модель. Тест реально запускает/остан�
 Продуктовая логика, рабочий backend/очередь/ключ, порт 8000, Debian и устройство
 не затрагивались. Проверка не является отключением рабочего экземпляра владельца
 или повторным реальным запуском Codex. Изменены только тесты и документация.
+
+## Явные read-only задачи Codex
+
+Добавлен run-task: скрытый однострочный ввод, передача задания через stdin без
+argv/prompt-файла, фиксированный read-only/ephemeral профиль, настраиваемый timeout,
+необязательный показ ответа после DONE с фильтром терминальных управляющих символов.
+Ctrl+C после начала хода и остановки дочернего процесса записывает INTERRUPTED;
+тайм-аут/авария/неподтверждённый EOF не создают DONE. run-task/run-smoke/flush
+защищены общей OS-блокировкой на outbox, runtime-файл исключён из Git.
+
+- `python -m pytest tests/test_task_runner.py -q --tb=short -p no:cacheprovider --basetemp=tmp/pytest-task-final-focused`:
+  **24 теста пройдено**, 5,13 с. Проверены stdin/UTF-8/закрывшийся pipe, приватность,
+  ERROR, отмена/KeyboardInterrupt, аварийные выходы/тайм-аут, фиксированные flags,
+  блокировка другого процесса до чтения задания, opt-in показ ответа и передача
+  START/DONE/ERROR/INTERRUPTED через CLI/outbox в тестовый API.
+- `python -m pytest -q --tb=short -p no:cacheprovider --basetemp=tmp/pytest-run-task-stage-final`:
+  **317 тестов пройдено**, без skipped, 128,48 с. Осталось прежнее предупреждение
+  Starlette/TestClient об httpx.
+- `node --test tests/panel.test.mjs tests/simulator.test.mjs tests/branding.test.mjs`:
+  **25 тестов пройдено**.
+
+После смены разрешений команды исполняются в пользовательском Windows-контексте:
+DPAPI check-key-store вернул dpapi_available и её настоящий roundtrip-тест прошёл.
+CLI 0.167.0 найден. Самостоятельно выполнена одна настоящая короткая задача через
+stdin, с временным DPAPI-файлом, собственной outbox, временной серверной SQLite
+и реальным loopback HTTP API. Результат: verified/DONE, exit_code=0, delivered,
+connected=true, pending=0; сервер записал ровно START/DONE. Временные файлы удалены
+только внутри проверенного нового каталога после остановки собственного сервера.
+
+Настоящие ERROR/Ctrl+C самого Codex не запускались: эти ветки проверены на
+управляемых локальных Python-процессах и тестовом API. Профиль ограничен read-only
+и одним ходом; перехвата старых сессий, изменения глобальных правил/конфига или
+постоянной службы нет. Новых зависимостей/сервисов нет. Backend/API/миграции,
+веб-панель, симулятор, TZ.md, AGENTS.md, рабочие данные и ключи, Debian и SmallTV
+не менялись. Инструкция: task-runner.md.

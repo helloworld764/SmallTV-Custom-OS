@@ -21,7 +21,7 @@ backend/migrations/  нумерованные SQL-миграции
 firmware/         описание будущего аппаратного компонента, без прошивки
 web/simulator/   HTML/CSS/JS симулятор, без сборщика и npm-зависимостей
 web/panel/       локальная веб-панель: вход, устройства и настройки
-codex-monitor/   диагностика, парсер и локальный smoke-мост с outbox/heartbeat
+codex-monitor/   read-only задачи Codex, парсер, outbox/heartbeat и DPAPI
 docs/            архитектура и границы первого этапа
 tests/           Python API/config и JavaScript connection tests
 ```
@@ -30,7 +30,7 @@ tests/           Python API/config и JavaScript connection tests
 Backend предназначен для Debian; локальная разработка и Codex остаются на Windows.
 SQLite хранит базовый реестр пользователей, устройств и настроек.
 Добавлены серверные сессии и API с проверкой владельца устройства.
-Tamagotchi, Telegram, OTA, реальная прошивка и монитор Codex не реализованы.
+Tamagotchi, Telegram, OTA, реальная прошивка и постоянный монитор всех сессий не реализованы.
 
 ## Windows (PowerShell)
 
@@ -174,6 +174,10 @@ API чтения устройств и изменения настроек тр�
 Локальная отправка нормализованных событий и heartbeat с устойчивой очередью
 и DPAPI-хранилищем ключа: [docs/local-monitor.md](docs/local-monitor.md).
 Это мост для одного smoke-запуска, без постоянного агента и подключения к Debian.
+Добавлена обёртка для явно запускаемых read-only задач:
+`.\.venv\Scripts\python.exe codex-monitor/local_monitor.py run-task --cwd . --show-answer`.
+Задание вводится скрыто и передаётся в stdin, а не в аргументы или очередь.
+Правила завершения, Ctrl+C и приватности: [docs/task-runner.md](docs/task-runner.md).
 Сначала проверить DPAPI без реального ключа:
 `.\.venv\Scripts\python.exe codex-monitor/local_monitor.py check-key-store`.
 

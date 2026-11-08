@@ -23,6 +23,7 @@ credentials/
 *.p12
 *.pfx
 *.dpapi
+*.monitor.lock
 id_rsa*
 id_ed25519*
 tokens.json

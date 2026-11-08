@@ -65,21 +65,36 @@ class DeliveryHookError(Exception):
     pass
 
 
-def observe(command, cwd, timeout=120, *, event_sink=None, tick=None):
+def observe(command, cwd, timeout=120, *, event_sink=None, tick=None, input_text=None,
+            require_answer=True, answer_sink=None, cancel_event=None):
     parser = ExecEvents()
     report = {'status': 'failed_start', 'real_run_checked': False, 'exit_code': None,
               'parser_outcome': 'UNKNOWN', 'parser_reason': None, 'answer_matches': False,
               'event_counts': dict.fromkeys(KNOWN_TYPES, 0), 'unknown_event_count': 0,
               'stderr_present': False, 'argument_hint': None}
+    if not require_answer:
+        report['answer_matches'] = None
+    answer = None
     try:
-        process = subprocess.Popen(command, cwd=cwd, stdin=subprocess.DEVNULL,
+        process = subprocess.Popen(command, cwd=cwd, stdin=subprocess.PIPE if input_text is not None else subprocess.DEVNULL,
                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=False,
                                    creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0),
                                    start_new_session=os.name != 'nt')
     except OSError:
         return report
     report['real_run_checked'] = True
-    messages, stop, excessive, reader_error = queue.Queue(maxsize=8), Event(), Event(), Event()
+    messages, stop, excessive, reader_error, input_error = queue.Queue(maxsize=8), Event(), Event(), Event(), Event()
+
+    def input_writer():
+        try:
+            process.stdin.write(input_text.encode('utf-8'))
+        except (OSError, ValueError):
+            input_error.set()
+        finally:
+            try:
+                process.stdin.close()
+            except (OSError, ValueError):
+                input_error.set()
 
     def stdout_reader():
         while not stop.is_set():
@@ -120,6 +135,9 @@ def observe(command, cwd, timeout=120, *, event_sink=None, tick=None):
     readers = [Thread(target=stdout_reader, daemon=True), Thread(target=stderr_reader, daemon=True)]
     for reader in readers:
         reader.start()
+    writer = Thread(target=input_writer, daemon=True) if input_text is not None else None
+    if writer is not None:
+        writer.start()
     deadline, size, pending = time.monotonic() + timeout, 0, b''
 
     def emit(events):
@@ -131,6 +149,7 @@ def observe(command, cwd, timeout=120, *, event_sink=None, tick=None):
                 raise DeliveryHookError from None
 
     def consume(raw):
+        nonlocal answer
         try:
             line = raw.decode('utf-8')
             events = parser.feed(line)
@@ -145,11 +164,22 @@ def observe(command, cwd, timeout=120, *, event_sink=None, tick=None):
             report['unknown_event_count'] += 1
         item = message.get('item') if isinstance(message, dict) else None
         if kind == 'item.completed' and isinstance(item, dict) and item.get('type') == 'agent_message':
-            report['answer_matches'] = item.get('text') == 'STORM_OK'
+            if require_answer:
+                report['answer_matches'] = item.get('text') == 'STORM_OK'
+            elif answer_sink is not None and isinstance(item.get('text'), str):
+                answer = item['text'][:32768]
+                if len(item['text']) > 32768:
+                    answer += '\n[Storm: answer truncated at 32768 characters]'
         return len(line) <= MAX_LINE_CHARS and parser.reason is None
 
     try:
         while True:
+            if cancel_event is not None and cancel_event.is_set():
+                report['status'] = 'cancelled'
+                break
+            if input_error.is_set():
+                report['status'] = 'stdin_write_failed'
+                break
             if tick is not None:
                 try:
                     tick()
@@ -188,8 +218,18 @@ def observe(command, cwd, timeout=120, *, event_sink=None, tick=None):
                     report['status'] = 'parser_rejected'
                     break
                 process.wait(timeout=max(0.01, deadline - time.monotonic()))
+                if writer is not None:
+                    writer.join(timeout=1)
+                    if writer.is_alive() or input_error.is_set():
+                        report['status'] = 'stdin_write_failed'
+                        break
                 emit(parser.finish(process.returncode))
-                report['status'] = 'verified' if parser.outcome == 'DONE' and report['answer_matches'] else 'unexpected_result'
+                if parser.outcome == 'DONE' and (not require_answer or report['answer_matches']):
+                    report['status'] = 'verified'
+                elif not require_answer and parser.outcome == 'ERROR':
+                    report['status'] = 'failed'
+                else:
+                    report['status'] = 'unexpected_result'
             break
     except subprocess.TimeoutExpired:
         report['status'] = 'timeout'
@@ -212,6 +252,10 @@ def observe(command, cwd, timeout=120, *, event_sink=None, tick=None):
             report['status'] = 'cleanup_failed'
         for reader in readers:
             reader.join(timeout=1)
+        if writer is not None:
+            writer.join(timeout=1)
+            if writer.is_alive():
+                report['status'] = 'cleanup_failed'
         if any(reader.is_alive() for reader in readers):
             report['status'] = 'cleanup_failed'
         else:
@@ -219,6 +263,16 @@ def observe(command, cwd, timeout=120, *, event_sink=None, tick=None):
             process.stderr.close()
         if report['status'] == 'verified' and (excessive.is_set() or reader_error.is_set()):
             report['status'] = 'output_limit' if excessive.is_set() else 'stream_read_failed'
+    if report['status'] == 'cancelled' and process.returncode is not None:
+        try:
+            emit(parser.finish(process.returncode, cancelled_by_user=True))
+        except DeliveryHookError:
+            report['status'] = 'delivery_error'
+    if report['status'] == 'verified' and answer_sink is not None and answer is not None:
+        try:
+            answer_sink(answer)
+        except Exception:
+            report['status'] = 'answer_output_failed'
     report.update(exit_code=process.returncode, parser_outcome=parser.outcome, parser_reason=parser.reason)
     return report
 
