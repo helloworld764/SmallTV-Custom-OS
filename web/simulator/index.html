@@ -16,20 +16,20 @@
     <p><a href="/panel/">Storm Control Panel →</a></p>
     <div class="case">
       <section class="display" data-theme="red" aria-label="Экран Storm OS 240 на 240 пикселей">
-        <header>Storm OS <span id="indicator" data-state="unknown" role="img" aria-label="Доступность неизвестна"></span></header>
+        <header><span class="screen-brand"><img src="storm-logo.png" alt=""><span>Storm OS</span></span> <span id="indicator" data-state="unknown" role="img" aria-label="Доступность неизвестна"></span></header>
         <div id="screen-content">
-          <div id="clock-content"><div id="clock">--:--:--</div><div id="date"></div></div>
+          <div id="clock-content"><div id="clock">--:--:--</div><div id="date"></div><div id="weather" aria-live="polite"><span id="weather-icon">&#xB7;</span><span id="weather-summary">&#x41F;&#x43E;&#x433;&#x43E;&#x434;&#x430; &#x437;&#x430;&#x433;&#x440;&#x443;&#x436;&#x430;&#x435;&#x442;&#x441;&#x44F;</span></div></div>
           <div id="placeholder" hidden><strong id="screen-title"></strong><p>Экран ещё не подключён</p></div>
           <div id="pet-content" hidden>
             <canvas id="pet-art" width="208" height="146" aria-label="Питомец"></canvas>
             <div id="pet-labels"><div id="pet-name"></div><div id="pet-caption">Загружаем питомца…</div></div>
           </div>
         </div>
-        <div id="status" role="status">Проверка связи…</div>
         <div id="notice" hidden></div>
         <footer>Storm Simulator</footer>
       </section>
     </div>
+    <p class="weather-credit">&#x418;&#x441;&#x442;&#x43E;&#x447;&#x43D;&#x438;&#x43A; &#x43F;&#x43E;&#x433;&#x43E;&#x434;&#x44B;: Open-Meteo; &#x433;&#x435;&#x43E;&#x43A;&#x43E;&#x434;&#x438;&#x440;&#x43E;&#x432;&#x430;&#x43D;&#x438;&#x435; GeoNames.</p>
     <p id="checked">Успешных проверок ещё нет.</p>
     <p id="preview-status" role="status">Автономное превью часов.</p>
     <p id="event-status" role="status">Уведомления Codex доступны в превью выбранного устройства после входа в панель.</p>

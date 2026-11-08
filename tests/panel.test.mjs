@@ -54,6 +54,20 @@ test('logout handles empty 204 response and sends CSRF without a body', async ()
   assert.equal(await client.logout(csrf), null);
 });
 
+test('weather city preference reads privately and writes with CSRF', async () => {
+  const paths = [];
+  const client = new ApiClient({ fetcher: async (path, options) => {
+    paths.push([path, options.method, options.headers['X-CSRF-Token']]);
+    return reply({ city: 'Kazan', timezone: 'Europe/Moscow' });
+  } });
+  assert.deepEqual(await client.weatherPreference(), { city: 'Kazan', timezone: 'Europe/Moscow' });
+  assert.deepEqual(await client.saveWeatherPreference('Kazan', csrf), { city: 'Kazan', timezone: 'Europe/Moscow' });
+  assert.deepEqual(paths, [
+    ['/api/v1/preferences/weather', 'GET', undefined],
+    ['/api/v1/preferences/weather', 'PATCH', csrf],
+  ]);
+});
+
 test('HTTP errors preserve status, never display raw server detail or retry mutations', async () => {
   for (const status of [401, 403, 404, 422, 429, 500]) {
     let requests = 0;

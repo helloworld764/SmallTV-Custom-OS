@@ -10,7 +10,6 @@ const preview = new PreviewSettings(deviceId);
 const notifications = new Notifications(deviceId);
 const api = new ApiClient({ timeout: 2500 });
 const indicator = document.querySelector('#indicator');
-const status = document.querySelector('#status');
 const checked = document.querySelector('#checked');
 const notice = document.querySelector('#notice');
 const labels = {
@@ -22,6 +21,7 @@ const petCanvas = document.querySelector('#pet-art');
 const petContext = petCanvas.getContext('2d');
 const petImages = new Map();
 let currentPet = null;
+let weatherLastAttempt = 0;
 let petError = 'Питомец ещё не загружен.';
 let petTimer = null;
 const petScreenIsReady = () => preview.state === 'fresh' && preview.settings.start_screen === 'tamagotchi';
@@ -119,9 +119,29 @@ function renderPreview() {
 function render() {
   indicator.dataset.state = connection.state;
   indicator.setAttribute('aria-label', labels[connection.state]);
-  status.textContent = labels[connection.state];
   if (connection.lastSuccess !== null) {
     checked.textContent = `Последняя успешная проверка: ${new Date(connection.lastSuccess).toLocaleTimeString('ru-RU')}`;
+  }
+}
+
+async function pollWeather() {
+  weatherLastAttempt = Date.now();
+  const summary = document.querySelector('#weather-summary');
+  const icon = document.querySelector('#weather-icon');
+  if (preview.settings.start_screen !== 'clock') return;
+  try {
+    const data = await api.weather();
+    if (!data || typeof data.available !== 'boolean') throw new Error('Invalid weather response');
+    if (!data.available) {
+      icon.textContent = '\u00b7';
+      summary.textContent = `${data.city || '\u041f\u043e\u0433\u043e\u0434\u0430'}: \u043d\u0435\u0442 \u0434\u0430\u043d\u043d\u044b\u0445`;
+      return;
+    }
+    icon.textContent = data.icon;
+    summary.textContent = `${data.city} \u00b7 ${data.temperature_c}\u00b0 \u00b7 ${data.condition}${data.stale ? ' \u00b7 \u0443\u0441\u0442\u0430\u0440\u0435\u043b\u043e' : ''}`;
+  } catch {
+    icon.textContent = '\u00b7';
+    summary.textContent = '\u041f\u043e\u0433\u043e\u0434\u0430 \u0432\u0440\u0435\u043c\u0435\u043d\u043d\u043e \u043d\u0435\u0434\u043e\u0441\u0442\u0443\u043f\u043d\u0430';
   }
 }
 
@@ -146,6 +166,7 @@ async function poll() {
     if (ok) {
       try {
         preview.apply(await api.settings(deviceId), Date.now());
+        if (preview.settings.start_screen === 'clock' && Date.now() - weatherLastAttempt >= 60_000) void pollWeather();
         const startedAt = performance.now();
         const page = await readNotifications(api, deviceId, notifications.cursor);
         notifications.apply(page, performance.now(), startedAt);
@@ -204,4 +225,5 @@ function tick() {
 tick();
 renderPreview();
 setInterval(tick, 1000);
+setInterval(() => { if (deviceId && preview.canDisplaySettings && Date.now() - weatherLastAttempt >= 60_000) void pollWeather(); }, 60_000);
 poll();

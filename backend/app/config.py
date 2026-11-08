@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     agent_offline_seconds: int = Field(default=90, ge=15, le=86400)
     device_stale_seconds: int = Field(default=30, ge=10, le=3600)
     device_offline_seconds: int = Field(default=90, ge=15, le=86400)
+    weather_cache_seconds: int = Field(default=900, ge=300, le=1800)
+    weather_timeout_seconds: float = Field(default=4.0, gt=0, le=15)
 
     @model_validator(mode="after")
     def validate_agent_timeouts(self):

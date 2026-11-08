@@ -56,6 +56,19 @@ export class ApiClient {
     return settingsData(await this.request(`/api/v1/devices/${encodeURIComponent(id)}/settings`), id);
   }
   async currentPet() { return this.request('/api/v1/pets/current'); }
+  async weatherPreference() {
+    const value = await this.request('/api/v1/preferences/weather');
+    if (!value || typeof value.city !== 'string' || typeof value.timezone !== 'string') throw new ApiError(502, 'protocol');
+    return value;
+  }
+  async saveWeatherPreference(city, csrf) {
+    const value = await this.request('/api/v1/preferences/weather', {
+      method: 'PATCH', body: { city }, headers: { 'X-CSRF-Token': csrf },
+    });
+    if (!value || typeof value.city !== 'string' || typeof value.timezone !== 'string') throw new ApiError(502, 'protocol');
+    return value;
+  }
+  async weather() { return this.request('/api/v1/weather'); }
   async save(id, changes, csrf) {
     return settingsData(await this.request(`/api/v1/devices/${encodeURIComponent(id)}/settings`, {
       method: 'PATCH', body: changes, headers: { 'X-CSRF-Token': csrf },

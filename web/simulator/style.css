@@ -9,13 +9,18 @@ p { color: #b7b7c2; line-height: 1.6; }
 .display[data-theme=purple] { --screen-bg: #130b1c; --screen-text: #f3e6ff; --screen-accent: #cc96fa; }
 .display[data-theme=light] { --screen-bg: #f3f4f7; --screen-text: #20232c; --screen-accent: #a71933; }
 [hidden] { display: none !important; }
+.screen-brand { display: inline-flex; align-items: center; gap: 5px; }
+.screen-brand img { width: 16px; height: 16px; object-fit: contain; }
+.screen-brand span { font-size: 10px; letter-spacing: 1px; }
 header { font-size: 12px; letter-spacing: 2px; color: var(--screen-accent); display: flex; align-items: center; justify-content: space-between; }
+.screen-brand { display: inline-flex; align-items: center; gap: 5px; }
+.screen-brand img { width: 16px; height: 16px; object-fit: contain; }
+.screen-brand span { font-size: 10px; letter-spacing: 1px; }
 #indicator { width: 10px; height: 10px; border-radius: 50%; background: #f5c84c; flex: none; }
 #indicator[data-state="online"] { background: #4bdb94; }
 #indicator[data-state="offline"] { background: #ff5264; }
 #screen-content { height: 112px; margin-top: 30px; }
 .display[data-screen=tamagotchi] #screen-content { height: 174px; margin-top: 4px; }
-.display[data-screen=tamagotchi] #status { margin-top: 2px; font-size: 10px; }
 .display[data-screen=tamagotchi] footer { display: none; }
 #clock { font: 36px ui-monospace, monospace; text-align: center; padding-top: 10px; }
 #placeholder { text-align: center; padding-top: 12px; }
@@ -29,7 +34,9 @@ header { font-size: 12px; letter-spacing: 2px; color: var(--screen-accent); disp
 @keyframes pet-breathe { 50% { transform: translateY(-1px) scale(1.008); } }
 @media (prefers-reduced-motion: reduce) { #pet-art { animation: none; } }
 #date { font-size: 13px; text-align: center; margin-top: 8px; }
-#status { font-size: 11px; color: var(--screen-text); text-align: center; margin-top: 6px; }
+#weather { display: flex; justify-content: center; align-items: center; gap: 5px; margin-top: 8px; color: var(--screen-text); font-size: 10px; line-height: 13px; text-align: center; }
+#weather-icon { font-size: 14px; }
+.weather-credit { font-size: 11px; }
 footer { position: absolute; bottom: 12px; font-size: 9px; letter-spacing: 1px; color: #9999a4; }
 #notice { position: absolute; inset: 54px 8px 44px; background: var(--screen-bg); border: 1px solid var(--screen-accent); padding: 28px 8px; box-sizing: border-box; text-align: center; font-size: 17px; }
 #notice { white-space: pre-line; font-size: 15px; }

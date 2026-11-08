@@ -29,6 +29,9 @@ def test_simulator_and_assets_are_served(client):
     assert 'lang="ru"' in response.text
     for asset in ('style.css', 'simulator.mjs', 'connection.mjs', 'preview.mjs', 'pet-display.mjs', 'pets/manifest.json'):
         assert client.get(f'/simulator/{asset}').status_code == 200
+    assert client.get('/simulator/storm-logo.png').headers['content-type'] == 'image/png'
+    assert 'id="weather-summary"' in response.text
+    assert 'id="status"' not in response.text
     for name in ('Pixel', 'Byte', 'Glitch'):
         response = client.get(f'/simulator/pets/{name}-states.png')
         assert response.status_code == 200

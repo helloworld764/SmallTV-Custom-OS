@@ -30,6 +30,8 @@ function setBusy(busy) {
   state.busy = busy;
   $('#login-fields').disabled = busy;
   $('#settings-fields').disabled = busy;
+  $('#weather-city').disabled = busy;
+  $('#weather-form button').disabled = busy;
   for (const button of document.querySelectorAll('#logout, #refresh, #load-more, #retry, .device-button')) button.disabled = busy;
 }
 
@@ -45,6 +47,8 @@ function loginView(text = '') {
   $('#account-name').textContent = '';
   $('#account-role').textContent = '';
   $('#save-result').textContent = '';
+  $('#weather-city').value = '';
+  $('#weather-result').textContent = '';
   $('#dashboard').hidden = true;
   $('#boot').hidden = true;
   $('#login-view').hidden = false;
@@ -176,6 +180,8 @@ async function dashboard(session) {
   $('#account-name').textContent = session.user.display_name;
   $('#account-role').textContent = session.user.role === 'super_admin' ? 'Администратор' : 'Пользователь';
   $('#devices-title').textContent = session.user.role === 'super_admin' ? 'Все устройства' : 'Мои устройства';
+  const weatherPreference = await api.weatherPreference();
+  $('#weather-city').value = weatherPreference.city;
   await loadDevices();
 }
 
@@ -196,6 +202,17 @@ $('#login-form').addEventListener('submit', event => {
   const password = $('#password').value;
   $('#password').value = '';
   run(async () => { await dashboard(await api.login(username, password)); }, 'login');
+});
+$('#weather-form').addEventListener('submit', event => {
+  event.preventDefault();
+  const city = $('#weather-city').value.trim();
+  if (!city || !state.session) return;
+  $('#weather-result').textContent = '';
+  run(async () => {
+    const saved = await api.saveWeatherPreference(city, state.session.csrf_token);
+    $('#weather-city').value = saved.city;
+    $('#weather-result').textContent = `Город сохранён: ${saved.city} (${saved.timezone}).`;
+  }, 'weather-save');
 });
 $('#logout').addEventListener('click', () => {
   if (!canLeaveSettings()) return;

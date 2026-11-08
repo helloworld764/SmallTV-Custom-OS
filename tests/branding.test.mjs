@@ -18,7 +18,8 @@ for (const [path, title] of [
 test('display and navigation use Storm names while URLs stay compatible', () => {
   const simulator = readFileSync(new URL('../web/simulator/index.html', import.meta.url), 'utf8');
   const panel = readFileSync(new URL('../web/panel/index.html', import.meta.url), 'utf8');
-  assert.ok(simulator.includes('<header>Storm OS '));
+  assert.ok(simulator.includes('<span class="screen-brand"><img src="storm-logo.png" alt=""><span>Storm OS</span></span>'));
+  assert.ok(!simulator.includes('id="status"'));
   assert.ok(simulator.includes('<footer>Storm Simulator</footer>'));
   assert.ok(simulator.includes('href="/panel/">Storm Control Panel'));
   assert.ok(panel.includes('href="/simulator/"'));

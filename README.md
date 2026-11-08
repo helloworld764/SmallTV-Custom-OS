@@ -13,6 +13,8 @@ FastAPI backend, SQLite, веб-панель управления и симул�
 Требования проекта находятся в `TZ.md`, правила работы — в `AGENTS.md`.
 Изменения требований и правил требуют согласования владельца; ребрендинг отражён в ТЗ v1.2.
 
+Weather city preferences, API behavior and provider constraints: [docs/weather.md](docs/weather.md).
+
 ## Структура
 
 ```text
