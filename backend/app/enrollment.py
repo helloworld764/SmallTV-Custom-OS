@@ -128,6 +128,17 @@ def authenticated_device(request: Request, credentials: Annotated[HTTPAuthorizat
     return row['id']
 
 
+def require_device_key(connection, device_id: str, credentials: HTTPAuthorizationCredentials):
+    """Serialize heartbeat acceptance with credential rotation/revocation."""
+    valid = connection.execute('''SELECT 1 FROM device_credentials
+        JOIN devices ON devices.id = device_credentials.device_id
+        JOIN local_accounts ON local_accounts.user_id = devices.owner_id
+        WHERE device_id = ? AND token_hash = ? AND revoked_at IS NULL AND is_active = 1''',
+        (device_id, token_hash(credentials.credentials))).fetchone()
+    if valid is None:
+        raise HTTPException(401, 'Device authentication required', headers={'WWW-Authenticate': 'Bearer'})
+
+
 @router.get('/{device_id}/state')
 def device_state(device_id: str, request: Request, identity: Annotated[str, Depends(authenticated_device)]):
     if device_id != identity:
@@ -144,6 +155,7 @@ def revoke(device_id: str, request: Request, principal: Annotated[Principal, Dep
     with request.app.state.database.transaction() as connection:
         owned_device(connection, device_id, principal)
         connection.execute('UPDATE device_credentials SET revoked_at = ? WHERE device_id = ?', (now(), device_id))
+        connection.execute('DELETE FROM device_presence WHERE device_id = ?', (device_id,))
         audit(connection, principal.user.id, 'device.credentials.revoked', device_id)
     return Response(status_code=204)
 
@@ -156,5 +168,6 @@ def rotate(device_id: str, request: Request, principal: Annotated[Principal, Dep
         connection.execute('''INSERT INTO device_credentials VALUES (?, ?, ?, NULL)
             ON CONFLICT(device_id) DO UPDATE SET token_hash = excluded.token_hash,
             created_at = excluded.created_at, revoked_at = NULL''', (device_id, token_hash(token), now()))
+        connection.execute('DELETE FROM device_presence WHERE device_id = ?', (device_id,))
         audit(connection, principal.user.id, 'device.credentials.rotated', device_id)
     return CredentialView(device_id=device_id, token=token)

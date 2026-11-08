@@ -121,6 +121,8 @@ python3 -m venv .venv
 | `SMALLTV_SESSION_TTL_SECONDS` | `43200` | Срок сессии в секундах, 300–86400 |
 | `SMALLTV_AGENT_STALE_SECONDS` | `30` | Через сколько секунд heartbeat устаревает, 10–3600 |
 | `SMALLTV_AGENT_OFFLINE_SECONDS` | `90` | Тайм-аут связи агента, 15–86400; больше stale |
+| `SMALLTV_DEVICE_STALE_SECONDS` | `30` | Устаревание heartbeat устройства, 10–3600 |
+| `SMALLTV_DEVICE_OFFLINE_SECONDS` | `90` | Тайм-аут устройства, 15–86400; больше device stale |
 
 Пример смены порта на Windows:
 
@@ -152,6 +154,9 @@ API чтения устройств и изменения настроек тр�
 клиента устройства через одноразовый код, его отдельный ключ и отзыв доступа
 описаны в [docs/device-enrollment.md](docs/device-enrollment.md).
 Мастера привязки в панели и проверки физического устройства пока нет.
+Добавлены device heartbeat и чтение UNKNOWN/ONLINE/STALE/OFFLINE по серверному
+времени: [docs/device-presence.md](docs/device-presence.md). Чтение настроек,
+проверка health и браузерный симулятор не отправляют heartbeat за устройство.
 Для будущего Windows Codex Monitor добавлены отдельные регистрации и ключи
 агентов: [docs/agent-identities.md](docs/agent-identities.md). Добавлены серверный
 приём heartbeat и состояние связи UNKNOWN/ONLINE/STALE/OFFLINE по серверному времени.

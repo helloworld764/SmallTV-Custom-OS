@@ -5,6 +5,7 @@
 Мастер в Storm Control Panel и аппаратный Wi-Fi provisioning не добавлены.
 Отдельные credentials Windows-агента описаны в [agent-identities.md](agent-identities.md);
 они не взаимозаменяемы с ключами устройства.
+Серверный heartbeat устройства реализован отдельно: [device-presence.md](device-presence.md).
 
 ## Протокол
 

@@ -20,11 +20,15 @@ class Settings(BaseSettings):
     session_ttl_seconds: int = Field(default=43200, ge=300, le=86400)
     agent_stale_seconds: int = Field(default=30, ge=10, le=3600)
     agent_offline_seconds: int = Field(default=90, ge=15, le=86400)
+    device_stale_seconds: int = Field(default=30, ge=10, le=3600)
+    device_offline_seconds: int = Field(default=90, ge=15, le=86400)
 
     @model_validator(mode="after")
     def validate_agent_timeouts(self):
         if self.agent_offline_seconds <= self.agent_stale_seconds:
             raise ValueError("agent_offline_seconds must exceed agent_stale_seconds")
+        if self.device_offline_seconds <= self.device_stale_seconds:
+            raise ValueError("device_offline_seconds must exceed device_stale_seconds")
         return self
 
     @field_validator("db_path", mode="before")
