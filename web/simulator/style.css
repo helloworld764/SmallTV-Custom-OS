@@ -17,14 +17,15 @@ header { font-size: 12px; letter-spacing: 2px; color: var(--screen-accent); disp
 #indicator[data-state="online"] { background: #4bdb94; }
 #indicator[data-state="offline"] { background: #ff5264; }
 #screen-content { height: 112px; margin-top: 30px; }
-.display[data-screen=tamagotchi] #screen-content { width: calc(100% + 32px); height: 192px; margin: 0 0 0 -16px; }
+.display[data-screen=tamagotchi] { padding-top: 6px; padding-bottom: 6px; }
+.display[data-screen=tamagotchi] #screen-content { width: calc(100% + 32px); height: 208px; margin: 0 0 0 -16px; }
 .display[data-screen=tamagotchi] footer { display: none; }
 #clock { font: 36px ui-monospace, monospace; text-align: center; padding-top: 10px; }
 #placeholder { text-align: center; padding-top: 12px; }
 #placeholder strong { font-size: 20px; }
 #placeholder p { font-size: 12px; color: var(--screen-text); }
-#pet-content { height: 192px; display: flex; flex-direction: column; align-items: center; justify-content: space-between; text-align: center; margin-top: 0; }
-#pet-art { display: block; flex: 0 0 164px; width: 240px; height: 164px; max-width: 100%; margin: 0 auto; image-rendering: pixelated; animation: pet-breathe 8s ease-in-out infinite; }
+#pet-content { height: 208px; display: flex; flex-direction: column; align-items: center; justify-content: space-between; text-align: center; margin-top: 0; }
+#pet-art { display: block; flex: 0 0 180px; width: 240px; height: 180px; max-width: 100%; margin: 0 auto; image-rendering: pixelated; animation: pet-breathe 8s ease-in-out infinite; }
 #pet-labels { width: 100%; flex: 0 0 28px; background: none; text-align: center; }
 #pet-name { color: var(--screen-accent); font-size: 12px; line-height: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #pet-caption { color: var(--screen-text); font-size: 10px; line-height: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
