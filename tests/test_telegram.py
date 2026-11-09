@@ -561,3 +561,252 @@ def test_queued_sleep_notice_does_not_survive_switching_off_then_on(env):
     apply(env,'notify:enabled',callback=True,now=start+3602)
     client=FakeTelegram(); deliver_replies(env['db'],client,start+3603)
     assert not any('час сна завершён' in payload.get('text','') for _,payload in client.calls)
+
+
+def need_setup(env,enabled=True):
+    from backend.app.pet_needs import scan_needs
+    link(env); now=int(time.time())+1; adopt_in_bot(env,now)
+    with env['db'].transaction() as c:
+        c.execute('INSERT INTO telegram_preferences(user_id,enabled) VALUES (?,?)',(env['owner'],int(enabled)))
+        c.execute('DELETE FROM telegram_replies')
+    scan_needs(env['db'],now)
+    return now
+
+
+def need_values(env,now,satiety=80,energy=80,mood=80,**patch):
+    from backend.app import pet_engine
+    values={'satiety':satiety*pet_engine.UNIT,'energy':energy*pet_engine.UNIT,'mood':mood*pet_engine.UNIT,
+            'updated_at':now,'last_care_at':now,'reaction_at':now,'sleeping':0}|patch
+    with env['db'].transaction() as c:
+        c.execute('UPDATE pet_states SET '+','.join(key+'=?' for key in values),tuple(values.values()))
+
+
+def need_replies(env):
+    with env['db'].connection() as c:
+        return [dict(row) for row in c.execute('SELECT * FROM telegram_replies WHERE need_fields IS NOT NULL')]
+
+
+def test_pet_need_crossing_combines_fields_and_does_not_mutate_game(env):
+    from backend.app.pet_needs import scan_needs
+    now=need_setup(env)
+    need_values(env,now+60,satiety=20,energy=19,mood=18)
+    with env['db'].connection() as c: before=tuple(c.execute('SELECT * FROM pet_states').fetchone())
+    scan_needs(env['db'],now+60); scan_needs(env['db'],now+60)
+    replies=need_replies(env)
+    assert len(replies)==1
+    assert all(label in replies[0]['text'] for label in ('Пора покормить','Пора отдохнуть','Хочется поиграть'))
+    with env['db'].connection() as c: assert tuple(c.execute('SELECT * FROM pet_states').fetchone())==before
+    client=FakeTelegram(); deliver_replies(env['db'],client,now+60)
+    assert len(client.calls)==1
+
+
+def test_needs_rearm_at_30_and_have_six_hour_limit_without_delayed_reminders(env):
+    from backend.app.pet_needs import scan_needs
+    now=need_setup(env)
+    for offset,value in [(60,20),(120,29),(180,20),(240,30),(300,20)]:
+        need_values(env,now+offset,satiety=value); scan_needs(env['db'],now+offset)
+    assert len(need_replies(env))==1
+    # A long outage is a baseline, not a reminder when a cooldown happens to end.
+    later=now+6*3600+60
+    need_values(env,later,satiety=20); scan_needs(env['db'],later)
+    assert len(need_replies(env))==1
+    need_values(env,later+60,satiety=30); scan_needs(env['db'],later+60)
+    need_values(env,later+120,satiety=20); scan_needs(env['db'],later+120)
+    assert len(need_replies(env))==1  # Previous expired reply is pruned; this is the new event.
+    assert need_replies(env)[0]['notification_at']==later+120
+
+
+def test_disabled_need_episode_does_not_replay_after_enabling(env):
+    from backend.app.pet_needs import scan_needs
+    now=need_setup(env,False)
+    need_values(env,now+60,satiety=20); scan_needs(env['db'],now+60)
+    apply(env,'notify:enabled',callback=True,now=now+61)
+    scan_needs(env['db'],now+120)
+    assert need_replies(env)==[]
+    need_values(env,now+180,satiety=30); scan_needs(env['db'],now+180)
+    need_values(env,now+240,satiety=20); scan_needs(env['db'],now+240)
+    assert len(need_replies(env))==1
+
+
+@pytest.mark.parametrize('situation',['sleeping','missing','unknown','new_round','outage'])
+def test_needs_are_silent_in_suppressed_states_and_after_outage(env,situation):
+    from backend.app.pet_needs import scan_needs
+    now=need_setup(env)
+    patch={}
+    if situation=='sleeping': patch={'sleeping':1,'sleep_at':now+60}
+    elif situation=='missing': patch={'last_care_at':now+60-72*3600}
+    elif situation=='unknown': patch={'reaction_at':now+61}
+    elif situation=='new_round': patch={'round':2}
+    delta=301 if situation=='outage' else 60
+    need_values(env,now+delta,satiety=10,energy=10,mood=10,**patch)
+    scan_needs(env['db'],now+delta)
+    assert need_replies(env)==[]
+
+
+@pytest.mark.parametrize('recovery',['all','partial','sleep'])
+def test_pending_needs_drop_resolved_fields_and_sleeping_recipients(env,recovery):
+    from backend.app.pet_needs import scan_needs
+    now=need_setup(env)
+    need_values(env,now+60,satiety=10,energy=10); scan_needs(env['db'],now+60)
+    need_values(env,now+61,satiety=80,energy=10 if recovery=='partial' else 80,
+                **({'sleeping':1,'sleep_at':now+61} if recovery=='sleep' else {}))
+    client=FakeTelegram(); deliver_replies(env['db'],client,now+61)
+    if recovery=='partial':
+        assert len(client.calls)==1
+        assert 'Пора отдохнуть' in client.calls[0][1]['text'] and 'Пора покормить' not in client.calls[0][1]['text']
+    else: assert client.calls==[]
+
+
+def test_sleep_and_need_events_have_independent_durable_queue_identifiers(env):
+    from backend.app import pets
+    from backend.app.pet_needs import scan_needs
+    from backend.app.pet_sleep import complete_due_sleeps
+    now=need_setup(env)
+    with env['db'].transaction() as c:
+        c.execute('INSERT INTO telegram_links(telegram_id,user_id,linked_at) VALUES (202,?,?)',(env['other'],now-4000))
+        c.execute('INSERT INTO telegram_preferences(user_id,enabled) VALUES (?,1)',(env['other'],))
+        pet=pets.adopt_owned(c,env['other'],pets.Adopt(kind='Byte',name='Sleeper'),now-3540)
+        pets.act_owned(c,env['other'],pet.id,pets.PetAction(action_id=secrets.token_hex(16),action='sleep'),now-3540)
+    need_values_owner={'satiety':10*pets.engine.UNIT,'updated_at':now+60}
+    with env['db'].transaction() as c:
+        c.execute('UPDATE pet_states SET satiety=?,updated_at=? WHERE pet_id=(SELECT id FROM pets WHERE owner_id=?)',
+                  (*need_values_owner.values(),env['owner']))
+    scan_needs(env['db'],now+60); complete_due_sleeps(env['db'],now+60)
+    with env['db'].connection() as c:
+        rows=c.execute('SELECT update_id FROM telegram_replies WHERE notification_category IS NOT NULL').fetchall()
+    assert len(rows)==2 and len({row[0] for row in rows})==2 and all(row[0]<0 for row in rows)
+
+
+def device_options(env,card,label,now):
+    return apply(env,pet_button(card,label),callback=True,now=now)[1]
+
+
+def test_bot_theme_brightness_and_start_screen_share_panel_api_and_do_not_fake_presence(env):
+    link(env); now=int(time.time())
+    _,card=apply(env,'device:own-tv',callback=True,now=now)
+    themes=device_options(env,card,'Тема',now)
+    _,card=apply(env,pet_button(themes,'Синяя'),callback=True,now=now)
+    levels=device_options(env,card,'Яркость',now)
+    _,card=apply(env,pet_button(levels,'0%'),callback=True,now=now)
+    screens=device_options(env,card,'Стартовый экран',now)
+    _,card=apply(env,pet_button(screens,'Tamagotchi'),callback=True,now=now)
+    saved=env['api'].get('/api/v1/devices/own-tv/settings').json()
+    assert (saved['theme'],saved['brightness'],saved['start_screen'])==('Dark Blue',0,'tamagotchi')
+    assert 'сохранена на сервере' in card['text']
+    with env['db'].connection() as c:
+        assert c.execute('SELECT count(*) FROM device_presence').fetchone()[0]==0
+
+
+@pytest.mark.parametrize('value',['101','-1','2.5','text'])
+def test_custom_device_brightness_validates_and_then_accepts_exact_percent(env,value):
+    link(env); now=int(time.time())
+    _,card=apply(env,'device:own-tv',callback=True,now=now)
+    levels=device_options(env,card,'Яркость',now)
+    apply(env,pet_button(levels,'Своя яркость'),callback=True,now=now)
+    _,error=apply(env,value,now=now)
+    assert 'целое число' in error['text']
+    apply(env,'42',now=now)
+    assert env['api'].get('/api/v1/devices/own-tv/settings').json()['brightness']==42
+
+
+def test_old_consumed_setting_button_does_not_overwrite_a_newer_panel_value(env):
+    link(env); now=int(time.time())
+    _,card=apply(env,'device:own-tv',callback=True,now=now)
+    levels=device_options(env,card,'Яркость',now)
+    button=pet_button(levels,'25%')
+    update,_=apply(env,button,callback=True,now=now)
+    assert env['api'].patch('/api/v1/devices/own-tv/settings',headers=env['csrf'],json={'brightness':60}).status_code==200
+    process_update(env['db'],env['settings'],update,now=now)
+    _,duplicate=apply(env,button,callback=True,now=now)
+    assert 'уже была сохранена' in duplicate['text']
+    assert env['api'].get('/api/v1/devices/own-tv/settings').json()['brightness']==60
+
+
+def test_old_device_button_cannot_retarget_another_selection_or_expire_into_a_write(env):
+    link(env); now=int(time.time())
+    _,card=apply(env,'device:own-tv',callback=True,now=now)
+    themes=device_options(env,card,'Тема',now); button=pet_button(themes,'Синяя')
+    with env['db'].transaction() as c:
+        c.execute("INSERT INTO devices(id,owner_id,name) VALUES ('own-two',?,'Second')",(env['owner'],))
+        c.execute("INSERT INTO device_settings(device_id) VALUES ('own-two')")
+    apply(env,'device:own-two',callback=True,now=now)
+    apply(env,button,callback=True,now=now)
+    apply(env,'device:own-tv',callback=True,now=now)
+    _,expired=apply(env,button,callback=True,now=now+301)
+    assert 'устарела' in expired['text']
+    for did in ('own-tv','own-two'):
+        assert env['api'].get(f'/api/v1/devices/{did}/settings').json()['theme']=='BlackArch Red'
+
+
+def test_device_owner_is_rechecked_on_every_write_even_for_super_admin(env):
+    link(env); now=int(time.time())
+    _,card=apply(env,'device:own-tv',callback=True,now=now)
+    themes=device_options(env,card,'Тема',now); button=pet_button(themes,'Синяя')
+    with env['db'].transaction() as c: c.execute("UPDATE devices SET owner_id=? WHERE id='own-tv'",(env['other'],))
+    apply(env,button,callback=True,now=now)
+    assert env['api'].get('/api/v1/devices/own-tv/settings').json()['theme']=='BlackArch Red'
+
+
+def test_device_brightness_prompt_expires_and_other_menus_cancel_it(env):
+    link(env); now=int(time.time())
+    _,card=apply(env,'device:own-tv',callback=True,now=now)
+    levels=device_options(env,card,'Яркость',now)
+    apply(env,pet_button(levels,'Своя яркость'),callback=True,now=now)
+    _,expired=apply(env,'42',now=now+301)
+    assert 'устарел' in expired['text']
+    _,card=apply(env,'/device',now=now+302)
+    levels=device_options(env,card,'Яркость',now+302)
+    apply(env,pet_button(levels,'Своя яркость'),callback=True,now=now+302)
+    apply(env,'Настройки',now=now+302); apply(env,'42',now=now+302)
+    assert env['api'].get('/api/v1/devices/own-tv/settings').json()['brightness']==70
+
+
+def test_unused_old_setting_button_cannot_overwrite_a_concurrent_panel_change(env):
+    link(env); now=int(time.time())
+    _,card=apply(env,'device:own-tv',callback=True,now=now)
+    levels=device_options(env,card,'Яркость',now)
+    button=pet_button(levels,'25%')
+    env['api'].patch('/api/v1/devices/own-tv/settings',headers=env['csrf'],json={'brightness':60})
+    _,stale=apply(env,button,callback=True,now=now)
+    assert 'уже изменилась' in stale['text']
+    assert env['api'].get('/api/v1/devices/own-tv/settings').json()['brightness']==60
+
+
+def test_device_custom_prompt_detects_panel_change(env):
+    link(env); now=int(time.time())
+    _,card=apply(env,'device:own-tv',callback=True,now=now)
+    levels=device_options(env,card,'Яркость',now)
+    apply(env,pet_button(levels,'Своя яркость'),callback=True,now=now)
+    env['api'].patch('/api/v1/devices/own-tv/settings',headers=env['csrf'],json={'brightness':60})
+    _,stale=apply(env,'42',now=now)
+    assert 'уже изменилась' in stale['text']
+    assert env['api'].get('/api/v1/devices/own-tv/settings').json()['brightness']==60
+
+
+def test_stolen_device_button_is_bound_to_its_telegram_owner(env):
+    link(env); now=int(time.time())
+    _,card=apply(env,'device:own-tv',callback=True,now=now)
+    themes=device_options(env,card,'Тема',now); button=pet_button(themes,'Синяя')
+    with env['db'].transaction() as c:
+        c.execute("INSERT INTO telegram_links(telegram_id,user_id,selected_device_id,linked_at) VALUES (202,?,'other-tv',?)",(env['other'],now))
+    _,denied=apply(env,button,who=202,callback=True,now=now)
+    assert 'own-tv' not in denied['text']
+    assert env['api'].get('/api/v1/devices/own-tv/settings').json()['theme']=='BlackArch Red'
+
+
+def test_device_intents_and_prompts_are_revoked_by_restore_and_unlink(env,tmp_path):
+    from backend.app.backups import backup_database, restore_database
+    link(env); now=int(time.time())
+    _,card=apply(env,'device:own-tv',callback=True,now=now)
+    levels=device_options(env,card,'Яркость',now)
+    apply(env,pet_button(levels,'Своя яркость'),callback=True,now=now)
+    snapshot=tmp_path/'devices.sqlite3'; restored=tmp_path/'devices-restored.sqlite3'
+    backup_database(env['db'].path,snapshot)
+    restore_database(snapshot,restored,active_database=env['db'].path)
+    with Database(restored).connection() as c:
+        for table in ('telegram_device_intents','telegram_device_drafts','pet_need_tracking'):
+            assert c.execute(f'SELECT count(*) FROM {table}').fetchone()[0]==0
+    env['api'].delete('/api/v1/telegram/link',headers=env['csrf'])
+    with env['db'].connection() as c:
+        for table in ('telegram_device_intents','telegram_device_drafts'):
+            assert c.execute(f'SELECT count(*) FROM {table}').fetchone()[0]==0

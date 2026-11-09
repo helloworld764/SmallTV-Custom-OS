@@ -87,22 +87,18 @@ def update_settings(
     device_id: str, payload: SettingsPatch, request: Request,
     principal: Annotated[Principal, Depends(write_user)],
 ):
-    changes = payload.model_dump(exclude_unset=True)
     with request.app.state.database.transaction() as connection:
-        allowed = connection.execute("""
-            SELECT 1 FROM devices JOIN device_settings ON devices.id = device_settings.device_id
-            WHERE devices.id = ? AND (owner_id = ? OR ? = 'super_admin')
-        """, (device_id, *scope(principal))).fetchone()
-        if allowed is None:
-            raise HTTPException(404, "Device settings not found")
-        # Column names come exclusively from the strict Pydantic model, never raw input.
-        assignments = ', '.join(f'{column} = ?' for column in changes)
-        connection.execute(f"UPDATE device_settings SET {assignments} WHERE device_id = ?",
-                           (*changes.values(), device_id))
-        connection.execute("""
-            INSERT INTO audit_log (actor_id, action, resource_id)
-            VALUES (?, 'device.settings.updated', ?)
-        """, (principal.user.id, device_id))
-        return dict(connection.execute(
-            "SELECT * FROM device_settings WHERE device_id = ?", (device_id,)
-        ).fetchone())
+        return save_settings(connection,device_id,payload,*scope(principal))
+
+
+def save_settings(connection,device_id,payload,user_id,role='user'):
+    """Shared write; the caller authorizes its identity inside this transaction."""
+    changes=payload.model_dump(exclude_unset=True)
+    allowed=connection.execute('''SELECT 1 FROM devices JOIN device_settings ON devices.id=device_settings.device_id
+        WHERE devices.id=? AND (owner_id=? OR ?='super_admin')''',(device_id,user_id,role)).fetchone()
+    if allowed is None:
+        raise HTTPException(404,'Device settings not found')
+    assignments=', '.join(f'{column} = ?' for column in changes)
+    connection.execute(f'UPDATE device_settings SET {assignments} WHERE device_id=?',(*changes.values(),device_id))
+    connection.execute("INSERT INTO audit_log(actor_id,action,resource_id) VALUES (?,'device.settings.updated',?)",(user_id,device_id))
+    return dict(connection.execute('SELECT * FROM device_settings WHERE device_id=?',(device_id,)).fetchone())

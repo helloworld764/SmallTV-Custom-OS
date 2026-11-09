@@ -1,10 +1,9 @@
 """Durable completion of timed sleep; projections work even with no worker."""
 
-import json
 import time
 
 from . import pets
-from .telegram import notification_allowed
+from .bot_notifications import enqueue
 
 
 def complete_due_sleeps(database, now=None):
@@ -24,16 +23,6 @@ def complete_due_sleeps(database, now=None):
             # No stale backlog after an outage, no subscription before account linking.
             if now-session['due_at'] >= 1800:
                 continue
-            link = connection.execute('''SELECT telegram_links.telegram_id,linked_at FROM telegram_links
-                JOIN local_accounts ON local_accounts.user_id=telegram_links.user_id
-                WHERE telegram_links.user_id=? AND is_active=1''',(session['user_id'],)).fetchone()
-            if not link or link['linked_at'] > session['due_at'] or not notification_allowed(connection,session['user_id'],'pet',session['due_at']):
-                continue
-            if connection.execute('SELECT count(*) FROM telegram_replies WHERE telegram_id=?',(link['telegram_id'],)).fetchone()[0] >= 10:
-                continue
             text = f'{row["name"]}: час сна завершён, питомец проснулся! Энергия восстановлена до 100/100 в момент пробуждения. Откройте свежую карточку, чтобы увидеть текущее состояние.'
-            markup = json.dumps({'inline_keyboard':[[{'text':'Питомец','callback_data':'pet'}]]},ensure_ascii=False)
-            connection.execute('''INSERT INTO telegram_replies
-                (update_id,telegram_id,user_id,text,markup,expires_at,notification_category,notification_at)
-                VALUES (?,?,?,?,?,?, 'pet',?)''',
-                (-session['id'],link['telegram_id'],session['user_id'],text,markup,session['due_at']+1800,session['due_at']))
+            markup = {'inline_keyboard':[[{'text':'Питомец','callback_data':'pet'}]]}
+            enqueue(connection,session['user_id'],text,markup,session['due_at'],session['due_at']+1800,now)

@@ -7,7 +7,7 @@ import time
 from fastapi import HTTPException
 from pydantic import ValidationError
 
-from . import weather, bot_pets
+from . import weather, bot_pets, bot_devices
 from .security import token_hash
 from .telegram import CATEGORIES, active_link, preferences, throttle, unlink
 
@@ -83,12 +83,16 @@ def process_update(database, settings, update, now=None):
         link = active_link(connection, who)
         uid = link['user_id'] if link else None
         if text.startswith('/link '):
+            connection.execute('DELETE FROM telegram_device_drafts WHERE telegram_id=?',(who,))
+            connection.execute('DELETE FROM telegram_pet_drafts WHERE telegram_id=?',(who,))
             reply, uid = claim(connection, who, text[6:], now)
             markup = MENU
         elif not link:
             reply = 'Storm Bot. Войдите в Storm Control Panel, откройте раздел Telegram и получите код. Отправьте сюда /link и код через пробел. Код действует 5 минут. Пароль и токен бота сюда вводить не нужно.'
             markup = MENU
         elif prepared_user == uid and city is not None:
+            connection.execute('DELETE FROM telegram_device_drafts WHERE telegram_id=?',(who,))
+            connection.execute('DELETE FROM telegram_pet_drafts WHERE telegram_id=?',(who,))
             if not throttle(connection, f'city:{who}', now, 3):
                 reply = 'Слишком часто. Подождите минуту.'
             elif match:
@@ -98,10 +102,16 @@ def process_update(database, settings, update, now=None):
             else:
                 reply = city_error
             markup = MENU
+        elif bot_devices.is_device_input(connection, link, text, bool(callback_id)):
+            connection.execute("UPDATE telegram_links SET input_mode='' WHERE telegram_id=?",(who,))
+            connection.execute('DELETE FROM telegram_pet_drafts WHERE telegram_id=?',(who,))
+            reply,markup=bot_devices.handle(connection,link,text,now,bool(callback_id))
         elif bot_pets.is_pet_input(connection, link, text, bool(callback_id)):
+            connection.execute('DELETE FROM telegram_device_drafts WHERE telegram_id=?',(who,))
             connection.execute("UPDATE telegram_links SET input_mode='' WHERE telegram_id=?", (who,))
             reply, markup = bot_pets.handle(connection, link, text, now, bool(callback_id))
         else:
+            connection.execute('DELETE FROM telegram_device_drafts WHERE telegram_id=?',(who,))
             connection.execute('DELETE FROM telegram_pet_drafts WHERE telegram_id=?', (who,))
             reply, markup = dispatch(connection, link, text, now)
             if text == 'unlink':
@@ -141,20 +151,9 @@ def dispatch(connection, link, text, now):
         connection.execute("UPDATE telegram_links SET input_mode='' WHERE telegram_id=?", (who,))
     if text in ('/start', '/menu', 'menu'):
         return f'Здравствуйте, {link["display_name"]}! Storm Bot', MENU
-    if text in ('/devices', 'devices', 'Мои устройства'):
-        devices = connection.execute('SELECT id,name FROM devices WHERE owner_id=? ORDER BY id LIMIT 25', (uid,)).fetchall()
-        rows = [[(('✓ ' if row['id'] == link['selected_device_id'] else '')+row['name'][:40], 'device:'+row['id'])]
-                for row in devices if len(('device:'+row['id']).encode()) <= 64]
-        return ('Выберите своё устройство (первые 25):' if rows else 'Устройств пока нет. Подключение физического SmallTV будет доступно после подготовки прошивки.'), buttons(rows)
-    if text.startswith('device:'):
-        device = connection.execute('SELECT id,name FROM devices WHERE id=? AND owner_id=?', (text[7:], uid)).fetchone()
-        if not device:
-            return 'Устройство недоступно этому аккаунту.', MENU
-        connection.execute('UPDATE telegram_links SET selected_device_id=? WHERE telegram_id=?', (device['id'], who))
-        return f'Выбрано устройство: {device["name"]}. Состояние и применение настроек здесь пока не проверяются.', MENU
     if text in ('Настройки', '/settings', 'settings'):
         place = weather._preference(connection, uid)
-        return f'Город погоды: {place["city"]}.', buttons([[('Изменить город', 'city')], [('Уведомления', 'notifications')], [('Отключить Telegram', 'unlink-confirm')]])
+        return f'Город погоды: {place["city"]}.', buttons([[('Настройки устройства','device-settings')], [('Изменить город', 'city')], [('Уведомления', 'notifications')], [('Отключить Telegram', 'unlink-confirm')]])
     if text in ('/city', 'city'):
         connection.execute("UPDATE telegram_links SET input_mode='city' WHERE telegram_id=?", (who,))
         return 'Введите название города. Для отмены нажмите «Настройки».', MENU
@@ -173,10 +172,10 @@ def dispatch(connection, link, text, now):
         rows += [[(('✓ ' if pref[key] else '— ')+LABELS[key], 'notify:'+key)] for key in CATEGORIES]
         status = '🔔 Уведомления включены.' if pref['enabled'] else '🔕 Все уведомления выключены.'
         return (status+'\n\nГалочки — сохранённый выбор категорий. Общий выключатель временно отключает все категории, сохраняя выбор.'
-                '\n\nСейчас отправляется уведомление о завершении полного сна. Остальные события будут подключены позже.'), buttons(rows)
+                '\n\nРаботают сообщения о завершении сна и потребностях питомца. Предупреждения о потребностях — при 20/100 и ниже, не чаще раза в 6 часов.'), buttons(rows)
     if text == 'unlink-confirm':
         return 'Отключить этот Telegram от аккаунта?', buttons([[('Да, отключить', 'unlink'), ('Отмена', 'settings')]])
     if text == 'unlink':
         unlink(connection, uid)
         return 'Связь отключена. Для повторного подключения получите новый код в панели.', MENU
-    return 'Storm Bot работает в личном чате. Привязка: код в разделе Telegram веб-панели → /link код сюда. Настройки: город и категории уведомлений. Физическое устройство пока не подключается через бота; код на SmallTV потребует прошивки. Пароль от аккаунта боту не нужен.', MENU
+    return 'Storm Bot работает в личном чате. «Мои устройства» → выберите устройство → тема, яркость и стартовый экран. «Питомец» → состояние и уход. «Настройки» → город и категории уведомлений. Привязка аккаунта: код из веб-панели → /link код сюда. Настройки сохраняются на сервере; применение на физическом SmallTV пока не подтверждается. Пароль от аккаунта боту не нужен.', MENU

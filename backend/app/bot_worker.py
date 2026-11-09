@@ -10,6 +10,7 @@ import time
 from .bot_handler import process_update
 from .bot_pets import photo_path
 from .pet_sleep import complete_due_sleeps
+from .pet_needs import scan_needs, current_notice
 from .bot_transport import TelegramClient, TelegramError
 from .config import Settings
 from .database import Database
@@ -67,14 +68,18 @@ def deliver_replies(database, client, now=None):
             allowed = row['user_id'] is None or (link and link['user_id'] == row['user_id'])
             if row['notification_category']:
                 allowed = allowed and notification_allowed(connection,row['user_id'],row['notification_category'],row['notification_at'])
+            text=row['text']
+            if row['need_fields']:
+                text=current_notice(connection,row['user_id'],row['need_fields'],now)
+                allowed=allowed and text is not None
         if row['expires_at'] > now and allowed:
             try:
                 photo = photo_path(row['photo_asset'])
                 markup = json.loads(row['markup'])
                 if photo and photo.is_file():
-                    client.send_photo({'chat_id': row['telegram_id'], 'caption': row['text'], 'reply_markup': markup}, photo)
+                    client.send_photo({'chat_id': row['telegram_id'], 'caption': text, 'reply_markup': markup}, photo)
                 else:
-                    client.call('sendMessage', {'chat_id': row['telegram_id'], 'text': row['text'], 'reply_markup': markup})
+                    client.call('sendMessage', {'chat_id': row['telegram_id'], 'text': text, 'reply_markup': markup})
             except TelegramError as error:
                 if error.status not in (400, 403):
                     raise
@@ -87,6 +92,7 @@ def deliver_replies(database, client, now=None):
 
 def poll_once(database, settings, client):
     complete_due_sleeps(database)
+    scan_needs(database)
     deliver_replies(database, client)
     with database.connection() as connection:
         offset = connection.execute('SELECT next_offset FROM telegram_worker_state WHERE id=1').fetchone()[0]
@@ -106,6 +112,7 @@ def poll_once(database, settings, client):
             except TelegramError:
                 pass
     complete_due_sleeps(database)
+    scan_needs(database)
     deliver_replies(database, client)
 
 

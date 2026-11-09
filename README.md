@@ -11,6 +11,8 @@
 [docs/timed-pet-sleep.md](docs/timed-pet-sleep.md).
 Карточка питомца, создание и уход в боте реализованы:
 [docs/bot-pet-care.md](docs/bot-pet-care.md).
+Предупреждения о потребностях питомца и управление темой, яркостью и стартовым
+экраном из бота: [docs/pet-needs-and-device-controls.md](docs/pet-needs-and-device-controls.md).
 
 Техническое имя GitHub-репозитория остаётся `SmallTV-Custom-OS`.
 Пакет `backend`, идентификаторы `smalltv`, переменные `SMALLTV_`, API, JSON-ключи,
