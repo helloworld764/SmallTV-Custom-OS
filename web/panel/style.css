@@ -71,6 +71,13 @@ input:not([type=range]), select { width: 100%; padding: 12px 13px; border-radius
 .help { max-width: 760px; padding: 36px; margin: 40px auto; }.help h1 { font-size: 30px; }.help p { color: #c0c2cb; }.help pre { overflow-x: auto; background: #0b0c10; border-radius: 8px; padding: 18px; font-size: 12px; }
 .enrollment-dialog { color: inherit; width: min(560px, calc(100% - 32px)); max-height: calc(100dvh - 40px); padding: 28px; overflow-y: auto; }
 .enrollment-dialog::backdrop { background: #000a; }
+.device-presence { border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin: 16px 0; }
+.device-presence p:first-child { margin: 0 0 8px; font-size: 14px; font-weight: 600; }
+#device-presence[data-state=ONLINE] { color: #65c998; }
+#device-presence[data-state=STALE], #device-presence[data-state=UNAVAILABLE] { color: #c18c26; }
+#device-presence[data-state=OFFLINE] { color: var(--accent); }
+html[data-site-theme=light] #device-presence[data-state=ONLINE] { color: #216c47; }
+html[data-site-theme=light] #device-presence[data-state=STALE], html[data-site-theme=light] #device-presence[data-state=UNAVAILABLE] { color: #8a6012; }
 #enrollment-secret { display: block; overflow-wrap: anywhere; user-select: all; padding: 14px; border: 1px solid var(--border); border-radius: 8px; }
 #enrollment-result { font-size: 14px; overflow-wrap: anywhere; }
 @media(max-width: 1210px) { main { padding: 28px 24px 48px; }.login-layout { gap: 48px; padding-inline: 12px; } }

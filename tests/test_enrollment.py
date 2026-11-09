@@ -83,6 +83,50 @@ def test_preview_retry_and_concurrent_creation_are_idempotent(env):
         assert connection.execute('SELECT COUNT(*) FROM devices').fetchone()[0] == 1
 
 
+def test_preview_rename_does_not_break_original_request_retry(env):
+    client, _, csrf, *_ = env
+    payload = {'name': 'Original preview', 'request_id': str(uuid4())}
+    created = client.post('/api/v1/devices/previews', headers=csrf, json=payload).json()
+    identifier = created['id']
+    renamed = client.patch('/api/v1/devices/' + identifier, headers=csrf, json={'name': 'New name'})
+    assert renamed.status_code == 200 and renamed.json()['is_preview'] is True
+    retry = client.post('/api/v1/devices/previews', headers=csrf, json=payload)
+    assert retry.status_code == 200 and retry.json() == renamed.json()
+    assert client.post('/api/v1/devices/previews', headers=csrf, json={**payload, 'name': 'New name'}).status_code == 409
+    assert len(client.get('/api/v1/devices').json()) == 1
+    assert client.get(f'/api/v1/devices/{identifier}/presence').json()['state'] == 'UNKNOWN'
+
+
+def test_preview_name_migration_preserves_original_request_on_upgrade(tmp_path):
+    old_sources = tmp_path / 'sql-0014'
+    old_sources.mkdir()
+    for source in sorted(MIGRATIONS.glob('*.sql'))[:14]:
+        (old_sources / source.name).write_bytes(source.read_bytes())
+    database = Database(tmp_path / 'preview-upgrade.sqlite3', old_sources)
+    database.initialize()
+    password = secrets.token_urlsafe(24)
+    owner = create_account(database, 'upgrade-owner', password, 'Owner')
+    identifier, request_id = str(uuid4()), str(uuid4())
+    with database.transaction() as connection:
+        connection.execute('INSERT INTO devices(id,owner_id,name) VALUES (?,?,?)', (identifier, owner, 'Old preview'))
+        connection.execute('INSERT INTO device_settings(device_id) VALUES (?)', (identifier,))
+        connection.execute('INSERT INTO device_previews VALUES (?,?,?,?)', (identifier, request_id, owner, 1))
+        history = [tuple(row) for row in connection.execute('SELECT * FROM schema_migrations ORDER BY version')]
+    upgraded = Database(database.path)
+    upgraded.initialize()
+    upgraded.initialize()
+    with upgraded.connection() as connection:
+        assert connection.execute('SELECT request_name FROM device_previews').fetchone()[0] == 'Old preview'
+        assert [tuple(row) for row in connection.execute('SELECT * FROM schema_migrations WHERE version <= 14 ORDER BY version')] == history
+    with TestClient(create_app(Settings(_env_file=None, db_path=database.path))) as client:
+        login = client.post('/api/v1/auth/login', headers={'X-SmallTV-Client': 'web'},
+                            json={'username': 'upgrade-owner', 'password': password}).json()
+        headers = {'X-CSRF-Token': login['csrf_token']}
+        assert client.patch('/api/v1/devices/' + identifier, headers=headers, json={'name': 'Renamed'}).status_code == 200
+        retry = client.post('/api/v1/devices/previews', headers=headers, json={'name': 'Old preview', 'request_id': request_id})
+        assert retry.status_code == 200 and retry.json()['id'] == identifier
+
+
 @pytest.mark.parametrize('payload', [
     {'name': ' ', 'request_id': str(uuid4())}, {'name': 'x' * 81, 'request_id': str(uuid4())},
     {'name': 'Test', 'request_id': 'invalid'}, {'name': 'Test'},

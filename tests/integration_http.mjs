@@ -7,6 +7,7 @@ import { PreviewSettings } from '../web/simulator/preview.mjs';
 import { checkHealth } from '../web/simulator/connection.mjs';
 import { Notifications, readNotifications } from '../web/simulator/notifications.mjs';
 import { EnrollmentFlow } from '../web/panel/enrollment.mjs';
+import { DevicePresence, presenceText } from '../web/panel/device-presence.mjs';
 
 const { base, password } = JSON.parse(readFileSync(0, 'utf8'));
 const cookies = new Map();
@@ -34,6 +35,9 @@ const wizard = new EnrollmentFlow(client, { uuid: randomUUID });
 const localPreview = await wizard.createPreview('HTTP local preview', session.csrf_token);
 assert.equal(localPreview.is_preview, true);
 assert.equal((await wizard.createPreview('HTTP local preview', session.csrf_token)).id, localPreview.id);
+await client.renameDevice(localPreview.id, 'Renamed preview', session.csrf_token);
+assert.equal((await wizard.createPreview('HTTP local preview', session.csrf_token)).name, 'Renamed preview');
+assert.equal(presenceText(null, (await client.device(localPreview.id)).is_preview).state, 'PREVIEW');
 assert.equal((await client.request(`/api/v1/devices/${localPreview.id}/presence`)).state, 'UNKNOWN');
 await client.save(localPreview.id, { start_screen: 'tamagotchi' }, session.csrf_token);
 const localSettings = new PreviewSettings(localPreview.id);
@@ -83,10 +87,21 @@ const deviceAuth = { Authorization: `Bearer ${deviceCredential.token}` };
 const deviceState = await client.request(statePath, { headers: deviceAuth });
 assert.equal(deviceState.device_id, deviceCredential.device_id);
 assert.equal(deviceState.settings.start_screen, 'clock');
+const devicePresence = new DevicePresence(deviceCredential.device_id);
+devicePresence.apply(await client.presence(deviceCredential.device_id));
+assert.equal(devicePresence.view().state, 'UNKNOWN');
+await client.request(`/api/v1/devices/${deviceCredential.device_id}/heartbeat`, { method: 'POST', body: {}, headers: deviceAuth });
+devicePresence.apply(await client.presence(deviceCredential.device_id));
+assert.equal(devicePresence.view().state, 'ONLINE');
+await client.renameDevice(deviceCredential.device_id, 'Renamed client', session.csrf_token);
+assert.equal((await client.device(deviceCredential.device_id)).name, 'Renamed client');
+assert.equal((await client.request(statePath, { headers: deviceAuth })).device_id, deviceCredential.device_id);
 await client.request(`/api/v1/devices/${deviceCredential.device_id}/credentials/revoke`, {
   method: 'POST', headers: { 'X-CSRF-Token': session.csrf_token },
 });
 await assert.rejects(client.request(statePath, { headers: deviceAuth }), error => error.status === 401);
+devicePresence.apply(await client.presence(deviceCredential.device_id));
+assert.equal(devicePresence.view().state, 'OFFLINE');
 const agentCredential = await client.request('/api/v1/agents/codex', {
   method: 'POST', body: { name: 'HTTP agent identity test' }, headers: { 'X-CSRF-Token': session.csrf_token },
 });

@@ -53,6 +53,47 @@ def csrf(env):
     return {'X-CSRF-Token': sign_in(env).json()['csrf_token']}
 
 
+def test_device_rename_preserves_identity_settings_and_records_only_changes(env):
+    client, app, users, _ = env
+    headers = csrf(env)
+    before = client.get('/api/v1/devices/alice-tv').json()
+    settings = client.get('/api/v1/devices/alice-tv/settings').json()
+    name = 'Шторм на столе <b>1</b>'
+    response = client.patch('/api/v1/devices/alice-tv', headers=headers, json={'name': '  ' + name + '  '})
+    assert response.status_code == 200 and response.headers['cache-control'] == 'no-store'
+    assert response.json() == {**before, 'name': name}
+    assert client.get('/api/v1/devices').json()[0]['name'] == name
+    assert client.get('/api/v1/devices/alice-tv/settings').json() == settings
+    assert client.get('/api/v1/devices/alice-tv/presence').json()['state'] == 'UNKNOWN'
+    assert client.patch('/api/v1/devices/alice-tv', headers=headers, json={'name': name}).status_code == 200
+    app.state.database.initialize()
+    with app.state.database.connection() as connection:
+        assert connection.execute("SELECT name FROM devices WHERE id = 'alice-tv'").fetchone()[0] == name
+        rows = connection.execute("SELECT actor_id,resource_id FROM audit_log WHERE action = 'device.renamed'").fetchall()
+        assert [tuple(row) for row in rows] == [(users['alice'], 'alice-tv')]
+
+
+@pytest.mark.parametrize('payload', [{}, {'name': ''}, {'name': '   '}, {'name': 'x' * 81},
+                                   {'name': None}, {'name': 42}, {'name': 'New', 'owner_id': 'other'}])
+def test_device_rename_validates_name_and_rejects_owner_injection(env, payload):
+    headers = csrf(env)
+    assert env[0].patch('/api/v1/devices/alice-tv', headers=headers, json=payload).status_code == 422
+    assert env[0].get('/api/v1/devices/alice-tv').json()['name'] == 'alice-tv'
+
+
+def test_device_rename_requires_session_csrf_and_ownership(env):
+    client = env[0]
+    path = '/api/v1/devices/alice-tv'
+    assert client.patch(path, json={'name': 'New'}).status_code == 401
+    sign_in(env)
+    assert client.patch(path, json={'name': 'New'}).status_code == 403
+    headers = csrf(env)
+    assert client.patch('/api/v1/devices/bob-tv', headers=headers, json={'name': 'New'}).status_code == 404
+    assert client.patch('/api/v1/devices/missing', headers=headers, json={'name': 'New'}).status_code == 404
+    admin = {'X-CSRF-Token': sign_in(env, 'admin').json()['csrf_token']}
+    assert client.patch('/api/v1/devices/bob-tv', headers=admin, json={'name': 'Admin renamed'}).json()['name'] == 'Admin renamed'
+
+
 def test_login_session_cookie_and_no_plaintext_storage(env):
     client, app, users, password = env
     response = sign_in(env, 'ALICE')

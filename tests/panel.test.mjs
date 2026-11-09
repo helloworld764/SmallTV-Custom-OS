@@ -2,11 +2,117 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { ApiClient, ApiError, changesFrom, hasDraftChanges } from '../web/panel/api.mjs';
 import { EnrollmentFlow } from '../web/panel/enrollment.mjs';
+import { DevicePresence, presenceText } from '../web/panel/device-presence.mjs';
 
 const csrf = 'a'.repeat(64); // Deliberately synthetic, not a credential.
 const session = { user: { id: 'user-test', display_name: 'Test', role: 'user' }, csrf_token: csrf };
 const settings = { device_id: 'device-test', brightness: 70, theme: 'BlackArch Red', start_screen: 'clock' };
 const reply = (value, status = 200) => ({ ok: status < 400, status, json: async () => value });
+
+test('device rename uses CSRF and JSON while presence reads never send a heartbeat', async () => {
+  const calls = [];
+  const client = new ApiClient({ fetcher: async (path, options) => {
+    calls.push([path, options.method, options.body && JSON.parse(options.body), options.headers['X-CSRF-Token']]);
+    return reply({ id: 'tv/?', name: 'Renamed', is_preview: false });
+  } });
+  assert.equal((await client.renameDevice('tv/?', 'Renamed', csrf)).name, 'Renamed');
+  assert.equal((await client.device('tv/?')).id, 'tv/?');
+  await client.presence('tv/?');
+  assert.deepEqual(calls, [
+    ['/api/v1/devices/tv%2F%3F', 'PATCH', { name: 'Renamed' }, csrf],
+    ['/api/v1/devices/tv%2F%3F', 'GET', undefined, undefined],
+    ['/api/v1/devices/tv%2F%3F/presence', 'GET', undefined, undefined],
+  ]);
+});
+
+test('device reads and renames reject responses for another device or invalid names', async () => {
+  for (const value of [null, {}, { id: 'other', name: 'Valid', is_preview: false },
+    { id: 'tv', name: '', is_preview: false }, { id: 'tv', name: 'Valid', is_preview: 'yes' }]) {
+    const client = new ApiClient({ fetcher: async () => reply(value) });
+    await assert.rejects(client.device('tv'), error => error.kind === 'protocol');
+    await assert.rejects(client.renameDevice('tv', 'New', csrf), error => error.kind === 'protocol');
+  }
+});
+
+const heartbeatSnapshot = {
+  device_id: 'tv', state: 'ONLINE', server_time: 1000, last_seen_at: 1000,
+  stale_after_seconds: 30, offline_after_seconds: 90,
+};
+
+test('device presence starts unconfirmed and local preview is always explicitly labelled', () => {
+  const model = new DevicePresence('tv');
+  assert.equal(model.view().state, 'CHECKING');
+  assert.match(presenceText(model).lastSeen, /ещё не получен/);
+  model.apply(heartbeatSnapshot);
+  const preview = presenceText(model, true);
+  assert.equal(preview.state, 'PREVIEW');
+  assert.match(preview.text, /без физического устройства/);
+  assert.doesNotMatch(preview.text, /ONLINE/);
+});
+
+test('device state ages from server time without depending on the browser wall clock', () => {
+  let time = 0;
+  const model = new DevicePresence('tv', { clock: () => time });
+  model.apply({ ...heartbeatSnapshot, last_seen_at: 971 });
+  assert.equal(model.view().state, 'ONLINE');
+  time = 1000;
+  assert.equal(model.view().state, 'STALE');
+  model.apply({ ...heartbeatSnapshot, state: 'STALE', last_seen_at: 911 });
+  time += 1000;
+  assert.equal(model.view().state, 'OFFLINE');
+  model.apply({ ...heartbeatSnapshot, state: 'UNKNOWN', last_seen_at: 1001 });
+  assert.equal(model.view().state, 'UNKNOWN');
+  assert.match(presenceText(model).lastSeen, /Последняя полученная отметка/);
+});
+
+test('suspended tab and failed API check cannot keep a cached ONLINE', () => {
+  let time = 0;
+  const model = new DevicePresence('tv', { clock: () => time });
+  model.apply(heartbeatSnapshot);
+  time = 15000;
+  assert.equal(model.view().state, 'UNAVAILABLE');
+  model.apply(heartbeatSnapshot);
+  model.fail();
+  assert.equal(model.view().state, 'UNAVAILABLE');
+  assert.equal(model.view().last_seen_at, 1000);
+  model.apply(heartbeatSnapshot);
+  assert.equal(model.view().state, 'ONLINE');
+  assert.equal(model.failures, 0);
+});
+
+test('denied presence clears cached private timestamps and retries use bounded backoff', () => {
+  const model = new DevicePresence('tv', { clock: () => 0 });
+  model.apply(heartbeatSnapshot);
+  assert.equal(model.nextCheck, 10000);
+  for (const delay of [20000, 40000, 60000, 60000]) {
+    model.fail();
+    assert.equal(model.nextCheck, delay);
+  }
+  for (const status of [401, 403, 404]) {
+    model.apply(heartbeatSnapshot);
+    model.fail(status);
+    assert.equal(model.view().last_seen_at, null);
+    assert.equal(model.view().state, 'UNAVAILABLE');
+  }
+});
+
+test('malformed or wrong-device heartbeat snapshots cannot overwrite accepted data', () => {
+  const model = new DevicePresence('tv');
+  model.apply(heartbeatSnapshot);
+  for (const bad of [null, {}, { ...heartbeatSnapshot, device_id: 'other' },
+    { ...heartbeatSnapshot, state: 'SUCCESS' }, { ...heartbeatSnapshot, last_seen_at: null },
+    { ...heartbeatSnapshot, last_seen_at: 1001 }, { ...heartbeatSnapshot, server_time: '1000' },
+    { ...heartbeatSnapshot, offline_after_seconds: 30 }]) {
+    assert.throws(() => model.apply(bad), error => error.kind === 'protocol');
+    assert.equal(model.view().last_seen_at, 1000);
+  }
+});
+
+test('revoked credentials remain OFFLINE even when the last heartbeat is recent', () => {
+  const model = new DevicePresence('tv');
+  model.apply({ ...heartbeatSnapshot, state: 'OFFLINE', last_seen_at: null });
+  assert.equal(model.view().state, 'OFFLINE');
+});
 
 test('wizard API uses session CSRF, JSON bodies and encodes only resource ids in URLs', async () => {
   const calls = [];
@@ -31,7 +137,7 @@ test('wizard API uses session CSRF, JSON bodies and encodes only resource ids in
 });
 
 test('wizard rejects malformed success responses', async () => {
-  for (const value of [null, {}, { id: 'id', name: 'wrong', is_preview: true }]) {
+  for (const value of [null, {}, { id: 'id', name: 42, is_preview: true }]) {
     const client = new ApiClient({ fetcher: async () => reply(value) });
     await assert.rejects(client.createPreview('Preview', 'request-id', csrf), error => error.kind === 'protocol');
     await assert.rejects(client.enrollmentCode('Preview', csrf), error => error.kind === 'protocol');

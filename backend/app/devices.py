@@ -21,6 +21,11 @@ class DeviceView(BaseModel):
     is_preview: bool = False
 
 
+class DevicePatch(BaseModel):
+    model_config = ConfigDict(extra='forbid', str_strip_whitespace=True)
+    name: str = Field(min_length=1, max_length=80, strict=True)
+
+
 class SettingsView(BaseModel):
     device_id: str
     brightness: int
@@ -83,6 +88,25 @@ def settings(device_id: str, request: Request, principal: Annotated[Principal, D
     if row is None:
         raise HTTPException(404, "Device settings not found")
     return dict(row)
+
+
+@router.patch('/{device_id}', response_model=DeviceView)
+def rename_device(device_id: str, payload: DevicePatch, request: Request,
+                  principal: Annotated[Principal, Depends(write_user)]):
+    with request.app.state.database.transaction() as connection:
+        row = connection.execute('''SELECT * FROM devices
+            WHERE id = ? AND (owner_id = ? OR ? = 'super_admin')''', (device_id, *scope(principal))).fetchone()
+        if row is None:
+            raise HTTPException(404, 'Device not found')
+        if row['name'] != payload.name:
+            connection.execute('UPDATE devices SET name = ? WHERE id = ?', (payload.name, device_id))
+            connection.execute("INSERT INTO audit_log(actor_id,action,resource_id) VALUES (?,'device.renamed',?)",
+                               (principal.user.id, device_id))
+        result = dict(row)
+        result['name'] = payload.name
+        result['is_preview'] = connection.execute('SELECT 1 FROM device_previews WHERE device_id = ?',
+                                                  (device_id,)).fetchone() is not None
+        return result
 
 
 @router.patch("/{device_id}/settings", response_model=SettingsView)

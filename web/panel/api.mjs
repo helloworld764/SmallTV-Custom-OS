@@ -55,11 +55,20 @@ export class ApiClient {
   async settings(id) {
     return settingsData(await this.request(`/api/v1/devices/${encodeURIComponent(id)}/settings`), id);
   }
+  async device(id) {
+    return deviceData(await this.request(`/api/v1/devices/${encodeURIComponent(id)}`), id);
+  }
+  async renameDevice(id, name, csrf) {
+    return deviceData(await this.request(`/api/v1/devices/${encodeURIComponent(id)}`, {
+      method: 'PATCH', body: { name }, headers: { 'X-CSRF-Token': csrf },
+    }), id);
+  }
+  async presence(id) { return this.request(`/api/v1/devices/${encodeURIComponent(id)}/presence`); }
   async createPreview(name, requestId, csrf) {
     const value = await this.request('/api/v1/devices/previews', {
       method: 'POST', body: { name, request_id: requestId }, headers: { 'X-CSRF-Token': csrf },
     });
-    if (!value || typeof value.id !== 'string' || value.name !== name || value.is_preview !== true) throw new ApiError(502, 'protocol');
+    if (!value || typeof value.id !== 'string' || typeof value.name !== 'string' || value.is_preview !== true) throw new ApiError(502, 'protocol');
     return value;
   }
   async enrollmentCode(name, csrf) {
@@ -118,6 +127,12 @@ function sessionData(value) {
       || !['user', 'super_admin'].includes(value.user.role) || !/^[0-9a-f]{64}$/.test(value.csrf_token)) {
     throw new ApiError(502, 'protocol');
   }
+  return value;
+}
+
+function deviceData(value, expectedId) {
+  if (!value || value.id !== expectedId || typeof value.name !== 'string' || !value.name.trim()
+      || typeof value.is_preview !== 'boolean') throw new ApiError(502, 'protocol');
   return value;
 }
 

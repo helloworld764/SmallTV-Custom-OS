@@ -96,7 +96,7 @@ def test_panel_is_public_shell_with_no_private_data(client):
     assert 'id="settings-form"' in response.text
     assert 'id="empty"' in response.text
     assert 'type="password"' in response.text
-    for asset in ('style.css', 'panel.mjs', 'api.mjs', 'enrollment.mjs', 'help.html'):
+    for asset in ('style.css', 'panel.mjs', 'api.mjs', 'enrollment.mjs', 'device-presence.mjs', 'help.html'):
         assert client.get(f'/panel/{asset}').status_code == 200
     assert client.get('/api/v1/devices').status_code == 401
     assert client.get('/panel/%2e%2e/%2e%2e/backend/app/config.py').status_code == 404
@@ -106,7 +106,7 @@ def test_panel_is_public_shell_with_no_private_data(client):
 def test_panel_modules_override_windows_plaintext_mime(client, monkeypatch):
     mimetypes.init()
     monkeypatch.setitem(mimetypes.types_map, '.mjs', 'text/plain')
-    for asset in ('panel.mjs', 'api.mjs', 'enrollment.mjs'):
+    for asset in ('panel.mjs', 'api.mjs', 'enrollment.mjs', 'device-presence.mjs'):
         response = client.get(f'/panel/{asset}')
         assert response.headers['content-type'] == 'text/javascript; charset=utf-8'
         assert response.headers['x-content-type-options'] == 'nosniff'

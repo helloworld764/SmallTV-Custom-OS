@@ -1,8 +1,9 @@
 import { ApiClient, ApiError, changesFrom, hasDraftChanges } from './api.mjs';
 import { EnrollmentFlow } from './enrollment.mjs';
+import { DevicePresence, presenceText } from './device-presence.mjs';
 
 const $ = selector => document.querySelector(selector);
-const state = { session: null, devices: [], selected: null, settings: null, busy: false, more: false, loaded: 0 };
+const state = { session: null, devices: [], selected: null, settings: null, busy: false, more: false, loaded: 0, presence: null };
 let telegramCodeTimer;
 
 function clearTelegramCode() {
@@ -70,8 +71,7 @@ async function showAddedDevice(deviceId) {
   await loadDevices();
   // A new UUID may be beyond the first page. Fetch it without loading all devices.
   if (!state.devices.some(device => device.id === deviceId)) {
-    const added = await api.request(`/api/v1/devices/${encodeURIComponent(deviceId)}`);
-    if (added?.id !== deviceId || typeof added.name !== 'string') throw new ApiError(502, 'protocol');
+    const added = await api.device(deviceId);
     state.devices.unshift(added);
   }
   await selectDevice(deviceId);
@@ -102,13 +102,70 @@ function draft() {
   return { brightness: $('#brightness').value, theme: $('#theme').value, start_screen: $('#start-screen').value };
 }
 
-function dirty() {
+function settingsDirty() {
   return !$('#settings-form').hidden && hasDraftChanges(state.settings, draft());
+}
+
+function selectedDevice() { return state.devices.find(device => device.id === state.selected); }
+function nameDirty() {
+  return !$('#device-details').hidden && selectedDevice() && $('#device-name').value !== selectedDevice().name;
+}
+function dirty() { return settingsDirty() || nameDirty(); }
+
+function clearDeviceDetails() {
+  state.presence = null;
+  $('#device-details').hidden = true;
+  $('#device-name').value = '';
+  $('#rename-result').textContent = '';
+  $('#device-presence').textContent = '';
+  $('#device-last-seen').textContent = '';
+}
+
+function renderPresence() {
+  if ($('#device-details').hidden) return;
+  const preview = selectedDevice()?.is_preview === true;
+  const view = presenceText(state.presence, preview);
+  if ($('#device-presence').textContent !== view.text) $('#device-presence').textContent = view.text;
+  $('#device-presence').dataset.state = view.state;
+  if ($('#device-last-seen').textContent !== view.lastSeen) $('#device-last-seen').textContent = view.lastSeen;
+  $('#presence-refresh').hidden = preview;
+  $('#presence-refresh').disabled = state.busy || Boolean(state.presence?.busy);
+}
+
+async function refreshDevicePresence() {
+  const model = state.presence;
+  if (!model || model.busy || selectedDevice()?.is_preview || !state.session) return;
+  model.busy = true;
+  renderPresence();
+  const started = model.clock();
+  try {
+    const value = await api.presence(model.id);
+    if (state.presence === model) model.apply(value, started);
+  } catch (error) {
+    if (state.presence !== model) return;
+    model.fail(error.status);
+    if (error.status === 401) loginView('Сессия завершилась. Войдите снова.');
+    else if ([403, 404].includes(error.status)) {
+      clearDeviceDetails();
+      handleError(error);
+    }
+  } finally {
+    model.busy = false;
+    if (state.presence === model) renderPresence();
+  }
+}
+
+function applyDeviceName(device) {
+  state.devices = state.devices.map(row => row.id === device.id ? device : row);
+  $('#device-name').value = device.name;
+  $('#settings-title').textContent = device.name;
+  renderList();
+  renderPresence();
 }
 
 function canLeaveSettings() {
   if (!dirty()) return true;
-  message('Есть несохранённые настройки. Сначала сохраните их или нажмите «Отменить изменения».');
+  message('Есть несохранённые настройки или имя устройства. Сохраните их или отмените ввод в соответствующей форме.');
   return false;
 }
 
@@ -121,14 +178,17 @@ function setBusy(busy) {
   state.busy = busy;
   $('#login-fields').disabled = busy;
   $('#settings-fields').disabled = busy;
+  $('#rename-fields').disabled = busy;
   $('#weather-city').disabled = busy;
   $('#weather-form button').disabled = busy;
   for (const button of document.querySelectorAll('#telegram-code, #telegram-cancel, #telegram-unlink, #telegram-refresh')) button.disabled = busy;
   for (const button of document.querySelectorAll('#logout, #refresh, #load-more, #retry, #add-device, .device-button')) button.disabled = busy;
   renderEnrollment();
+  renderPresence();
 }
 
 function loginView(text = '') {
+  clearDeviceDetails();
   clearEnrollment();
   clearTelegramCode();
   state.session = null;
@@ -160,6 +220,7 @@ function handleError(error, context = '') {
   } else if (error instanceof ApiError && error.status === 403) {
     message('Не удалось подтвердить действие. Обновите страницу и повторите.');
   } else if (error instanceof ApiError && error.status === 404) {
+    clearDeviceDetails();
     state.settings = null;
     $('#settings-form').hidden = true;
     $('#device-preview').hidden = true;
@@ -167,7 +228,8 @@ function handleError(error, context = '') {
   } else if (error instanceof ApiError && error.status === 422) {
     message('Проверьте введённые значения и повторите.');
   } else {
-    message(context === 'save'
+    message(context === 'rename' ? 'Результат переименования не подтверждён. Проверьте связь и нажмите «Перечитать имя».'
+      : context === 'save'
       ? 'Не удалось подтвердить сохранение. Проверьте связь и перечитайте настройки с сервера.'
       : context === 'logout'
         ? 'Выход не подтверждён. Проверьте связь и повторите выход.'
@@ -229,6 +291,7 @@ function renderSettings() {
 }
 
 async function selectDevice(id) {
+  clearDeviceDetails();
   state.selected = id;
   state.settings = null;
   $('#settings-form').hidden = true;
@@ -241,6 +304,11 @@ async function selectDevice(id) {
   try {
     state.settings = await api.settings(id);
     renderSettings();
+    $('#device-name').value = selectedDevice().name;
+    $('#device-details').hidden = false;
+    state.presence = new DevicePresence(id);
+    renderPresence();
+    void refreshDevicePresence();
   } finally { $('#settings-loading').hidden = true; }
 }
 
@@ -252,6 +320,7 @@ async function loadDevices(append = false) {
   state.more = rows.length === 50;
   renderList();
   if (!append) {
+    clearDeviceDetails();
     state.selected = null;
     state.settings = null;
     $('#settings-form').hidden = true;
@@ -262,6 +331,7 @@ async function loadDevices(append = false) {
 }
 
 async function dashboard(session) {
+  clearDeviceDetails();
   clearEnrollment();
   state.session = session;
   state.devices = [];
@@ -294,6 +364,38 @@ async function bootstrap() {
 }
 
 $('#retry').addEventListener('click', () => run(bootstrap));
+$('#presence-refresh').addEventListener('click', () => { if (!state.busy) void refreshDevicePresence(); });
+$('#rename-form').addEventListener('submit', event => {
+  event.preventDefault();
+  const name = $('#device-name').value.trim();
+  if (!name || !state.selected || !state.session) return;
+  run(async () => {
+    $('#rename-result').textContent = '';
+    if (name === selectedDevice().name) {
+      $('#device-name').value = name;
+      $('#rename-result').textContent = 'Имя не изменилось.';
+      return;
+    }
+    const session = state.session, id = state.selected;
+    const device = await api.renameDevice(id, name, session.csrf_token);
+    if (state.session !== session || state.selected !== id) return;
+    applyDeviceName(device);
+    $('#rename-result').textContent = 'Имя устройства сохранено.';
+  }, 'rename');
+});
+$('#rename-discard').addEventListener('click', () => {
+  if (!selectedDevice()) return;
+  $('#device-name').value = selectedDevice().name;
+  $('#rename-result').textContent = 'Ввод имени отменён.';
+});
+$('#rename-reload').addEventListener('click', () => run(async () => {
+  const session = state.session, id = state.selected;
+  const device = await api.device(id);
+  if (state.session !== session || state.selected !== id) return;
+  applyDeviceName(device);
+  $('#rename-result').textContent = 'Имя перечитано с сервера.';
+}));
+$('#device-name').addEventListener('input', () => { $('#rename-result').textContent = ''; });
 $('#add-device').addEventListener('click', () => {
   if (state.busy || !state.session || !canLeaveSettings()) return;
   renderEnrollment();
@@ -419,7 +521,7 @@ $('#discard-settings').addEventListener('click', () => {
 });
 $('#settings-form').addEventListener('input', () => {
   $('#save-result').textContent = '';
-  $('#dirty-note').hidden = !dirty();
+  $('#dirty-note').hidden = !settingsDirty();
 });
 $('#brightness').addEventListener('input', () => { $('#brightness-range').value = $('#brightness').value; });
 $('#brightness-range').addEventListener('input', () => { $('#brightness').value = $('#brightness-range').value; });
@@ -439,6 +541,13 @@ $('#settings-form').addEventListener('submit', event => {
 });
 
 // Check expiry while the page is active; never silently replay a mutation.
+setInterval(() => {
+  if (!state.session || document.hidden) return;
+  renderPresence();
+  if (!state.busy && !$('#enrollment-dialog').open && state.presence && state.presence.clock() >= state.presence.nextCheck) {
+    void refreshDevicePresence();
+  }
+}, 1000);
 setInterval(() => {
   if (!state.session || state.busy || document.hidden || $('#enrollment-dialog').open || document.activeElement?.closest('form')) return;
   run(async () => {

@@ -78,11 +78,11 @@ def create_preview(payload: PreviewRequest, request: Request, response: Response
     """A session-only display preview; explicit and idempotent, never a device login."""
     owner, request_id, timestamp = principal.user.id, str(payload.request_id), now()
     with request.app.state.database.transaction() as connection:
-        previous = connection.execute('''SELECT devices.* FROM device_previews
+        previous = connection.execute('''SELECT devices.*, device_previews.request_name FROM device_previews
             JOIN devices ON devices.id = device_previews.device_id
             WHERE device_previews.owner_id = ? AND request_id = ?''', (owner, request_id)).fetchone()
         if previous is not None:
-            if previous['name'] != payload.name:
+            if previous['request_name'] != payload.name:
                 raise HTTPException(409, 'Request identifier already used with another name')
             response.status_code = 200
             return dict(previous)
@@ -93,7 +93,8 @@ def create_preview(payload: PreviewRequest, request: Request, response: Response
         identifier = str(uuid4())
         connection.execute('INSERT INTO devices(id, owner_id, name) VALUES (?, ?, ?)', (identifier, owner, payload.name))
         connection.execute('INSERT INTO device_settings(device_id) VALUES (?)', (identifier,))
-        connection.execute('INSERT INTO device_previews VALUES (?, ?, ?, ?)', (identifier, request_id, owner, timestamp))
+        connection.execute('''INSERT INTO device_previews(device_id, request_id, owner_id, created_at, request_name)
+            VALUES (?, ?, ?, ?, ?)''', (identifier, request_id, owner, timestamp, payload.name))
         audit(connection, owner, 'device.preview.created', identifier)
         return dict(connection.execute('SELECT * FROM devices WHERE id = ?', (identifier,)).fetchone())
 

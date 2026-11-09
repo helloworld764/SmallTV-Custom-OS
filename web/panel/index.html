@@ -74,6 +74,23 @@
         <aside class="card device-sidebar" aria-label="Выбор устройства"><div id="device-list"></div><button id="load-more" class="secondary" type="button" hidden>Показать ещё</button></aside>
         <section class="card settings-card" aria-labelledby="settings-title">
           <p class="eyebrow">НАСТРОЙКИ УСТРОЙСТВА</p><h2 id="settings-title">Выберите устройство</h2>
+          <div id="device-details" hidden>
+            <section class="device-presence" aria-label="Связь устройства">
+              <p id="device-presence" role="status"></p>
+              <p id="device-last-seen" class="hint"></p>
+              <p class="hint">Связь устройства определяется по heartbeat, отдельно от доступности API. Открытый симулятор не делает устройство ONLINE.</p>
+              <button id="presence-refresh" class="text-button" type="button">Обновить статус устройства</button>
+            </section>
+            <form id="rename-form">
+              <fieldset id="rename-fields">
+                <label for="device-name">Имя устройства</label>
+                <input id="device-name" maxlength="80" required autocomplete="off">
+                <div class="save-row"><button class="secondary" type="submit">Переименовать</button><button id="rename-discard" class="text-button" type="button">Отменить ввод</button><button id="rename-reload" class="text-button" type="button">Перечитать имя</button></div>
+              </fieldset>
+            </form>
+            <p id="rename-result" class="save-result" role="status"></p>
+            <div class="form-divider"></div>
+          </div>
           <a id="device-preview" class="button secondary" target="_blank" rel="noopener" hidden>Открыть превью устройства ↗</a>
           <p id="settings-loading" class="muted" hidden>Загружаем настройки…</p>
           <form id="settings-form" hidden>
