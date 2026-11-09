@@ -14,7 +14,7 @@ STATES = ('neutral','happy','eating','playing','sleeping','waking','hungry_sad',
 def main():
     output = SOURCE/'bot'
     output.mkdir(exist_ok=True)
-    manifest = {'purpose':'Storm Bot catalogue thumbnails; not firmware assets','size':[320,320],'sources':{},'files':{}}
+    manifest = {'purpose':'Storm Bot catalogue thumbnails; not firmware assets','size':[960,960],'sources':{},'files':{}}
     for kind in ('Pixel','Byte','Glitch'):
         path = SOURCE/(kind+'-states.png')
         manifest['sources'][kind] = hashlib.sha256(path.read_bytes()).hexdigest()
@@ -26,10 +26,10 @@ def main():
             bounds = cell.getchannel('A').getbbox()
             if bounds:
                 cell = cell.crop(bounds)
-            scale = min(300/cell.width,300/cell.height)
+            scale = min(900/cell.width,900/cell.height)
             cell = cell.resize((max(1,round(cell.width*scale)),max(1,round(cell.height*scale))),Image.Resampling.NEAREST)
-            canvas = Image.new('RGB',(320,320),(8,8,9))
-            canvas.paste(cell,((320-cell.width)//2,(320-cell.height)//2),cell)
+            canvas = Image.new('RGB',(960,960),(8,8,9))
+            canvas.paste(cell,((960-cell.width)//2,(960-cell.height)//2),cell)
             target = output/f'{kind}-{state}.png'
             canvas.save(target,optimize=True)
             manifest['files'][target.name] = hashlib.sha256(target.read_bytes()).hexdigest()

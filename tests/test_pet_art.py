@@ -27,7 +27,7 @@ def test_bot_thumbnails_are_complete_catalogue_without_metadata_or_private_chara
     for name,checksum in manifest['files'].items():
         data=photo_path(name[:-4]).read_bytes()
         assert hashlib.sha256(data).hexdigest()==checksum
-        assert len(data)<1048576 and struct.unpack('>II',data[16:24])==(320,320)
+        assert len(data)<1048576 and struct.unpack('>II',data[16:24])==(960,960)
         offset=8
         while offset<len(data):
             length=int.from_bytes(data[offset:offset+4],'big')
