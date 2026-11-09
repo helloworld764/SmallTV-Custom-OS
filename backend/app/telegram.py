@@ -36,6 +36,14 @@ def preferences(connection, user_id):
     return {key: bool(row[key]) if row else key != 'enabled' for key in ('enabled', *CATEGORIES)}
 
 
+def notification_allowed(connection, user_id, category, occurred_at):
+    row = connection.execute('SELECT * FROM telegram_preferences WHERE user_id=?',(user_id,)).fetchone()
+    if (row is None or category not in CATEGORIES or not row['enabled'] or not row[category]
+            or occurred_at is None or row['enabled_since'] is None or row['enabled_since'] > occurred_at):
+        return False
+    return category != 'pet' or (row['pet_enabled_since'] is not None and row['pet_enabled_since'] <= occurred_at)
+
+
 @router.get('/status')
 def status(request: Request, principal: Annotated[Principal, Depends(current_user)]):
     with request.app.state.database.connection() as connection:

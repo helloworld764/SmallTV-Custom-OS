@@ -74,6 +74,9 @@ def card(connection, uid, now, prefix=''):
     rows = []
     if pet.lifecycle == 'ACTIVE':
         text += EMOTION_TEXT[pet.emotion]
+        if pet.sleeping and pet.sleep_ends_at:
+            seconds = max(0,pet.sleep_ends_at-now)
+            text += f'\nПроснётся через {seconds//60} мин {seconds%60} сек. Полный сон — 1 час и 100/100 энергии; раннее пробуждение не даёт прибавки.'
         actions = [('Разбудить','wake')] if pet.sleeping else [('Кормить','feed'),('Играть','play'),('Спать','sleep')]
         rows = [[(label,new_intent(connection,row,action,now))] for label,action in actions]
     elif pet.lifecycle == 'ABSENT':

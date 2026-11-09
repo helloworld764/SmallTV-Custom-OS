@@ -62,6 +62,7 @@ class PetView(BaseModel):
     energy: float
     mood: float
     sleeping: bool
+    sleep_ends_at: int | None
     lifecycle: Literal['ACTIVE', 'ABSENT', 'RETURN_AVAILABLE', 'UNKNOWN']
     clock_state: Literal['OK', 'UNKNOWN']
     emotion: Literal['content', 'hungry', 'tired', 'sad', 'sleepy', 'missing', 'unknown']
@@ -107,9 +108,14 @@ def view(row, timestamp):
     if state['lifecycle'] == 'ACTIVE' and 0 <= timestamp - row['reaction_at'] < engine.REACTION_TTL_SECONDS:
         reaction = Reaction(id=row['reaction_id'], kind=row['reaction_kind'],
                             expires_at=row['reaction_at'] + engine.REACTION_TTL_SECONDS)
+    if row['sleeping'] and not state['sleeping'] and state['lifecycle'] == 'ACTIVE':
+        due = (row['sleep_at'] if row['sleep_at'] is not None else row['updated_at']) + engine.SLEEP_SECONDS
+        if 0 <= timestamp-due < engine.REACTION_TTL_SECONDS:
+            reaction = Reaction(id=f'auto-wake:{row["id"]}:{due}',kind='WAKE',expires_at=due+engine.REACTION_TTL_SECONDS)
     return PetView(id=row['id'], kind=row['kind'], name=row['name'],
                    **{key: round(state[key] / engine.UNIT, 2) for key in ('satiety', 'energy', 'mood')},
                    sleeping=bool(state['sleeping']) and state['lifecycle'] == 'ACTIVE',
+                   sleep_ends_at=state['sleep_ends_at'] if state['lifecycle'] == 'ACTIVE' and state['sleeping'] else None,
                    lifecycle=state['lifecycle'], clock_state=state['clock_state'], emotion=engine.emotion(state),
                    round=row['round'], last_care_at=row['last_care_at'],
                    disappeared_at=state['disappeared_at'], return_available_at=state['return_available_at'],
@@ -187,6 +193,12 @@ def act_owned(connection, owner_id, pet_id, payload, timestamp):
             + (identifier, payload.action.upper(), timestamp, pet_id))
     connection.execute('INSERT INTO pet_actions VALUES (?, ?, ?, ?, ?, ?)',
                        (pet_id, identifier, payload.action, int(payload.confirm_restart), timestamp, state['round']))
+    if payload.action == 'sleep':
+        connection.execute('''INSERT INTO pet_sleep_sessions(session_key,pet_id,user_id,round,started_at,due_at)
+            VALUES (?,?,?,?,?,?)''', (identifier,pet_id,owner_id,state['round'],timestamp,timestamp+engine.SLEEP_SECONDS))
+    elif payload.action in ('wake','return'):
+        connection.execute("""UPDATE pet_sleep_sessions SET status='cancelled' WHERE pet_id=? AND status='pending'
+            AND (?='return' OR due_at>?)""",(pet_id,payload.action,timestamp))
     return ActionReceipt(action_id=identifier, pet_id=pet_id, action=payload.action, duplicate=False,
                          applied_at=timestamp, round=state['round'],
                          reaction=Reaction(id=identifier, kind=payload.action.upper(), expires_at=timestamp + engine.REACTION_TTL_SECONDS))

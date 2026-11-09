@@ -45,6 +45,28 @@ def current(env):
     return response.json()
 
 
+def test_sleep_upgrade_preserves_existing_pet_and_uses_original_start(tmp_path):
+    import shutil
+    legacy=tmp_path/'migrations'
+    legacy.mkdir()
+    for source in sorted(MIGRATIONS.glob('*.sql'))[:11]: shutil.copyfile(source,legacy/source.name)
+    database=Database(tmp_path/'legacy.sqlite3',legacy)
+    database.initialize()
+    owner=create_account(database,'legacy-owner',secrets.token_urlsafe(24),'Owner')
+    with database.transaction() as connection:
+        pets.adopt_owned(connection,owner,pets.Adopt(kind='Pixel',name='Legacy'),1000)
+        connection.execute('UPDATE pet_states SET sleeping=1,sleep_at=1000,energy=?',(10*pets.engine.UNIT,))
+    upgraded=Database(database.path)
+    upgraded.initialize()
+    with upgraded.connection() as connection:
+        row=pets.find_pet(connection,owner)
+        assert row['name']=='Legacy' and row['energy']==10*pets.engine.UNIT
+        assert pets.view(row,4599).sleeping is True
+        assert pets.view(row,4600).energy==100 and pets.view(row,4600).sleeping is False
+        session=connection.execute('SELECT started_at,due_at FROM pet_sleep_sessions').fetchone()
+        assert tuple(session)==(1000,4600)
+
+
 def test_adoption_name_catalog_stats_reactions_and_pure_reads(env):
     assert env[0].get('/api/v1/pets/catalog').json() == ['Pixel', 'Byte', 'Glitch']
     pet = adopt(env, '  Мур  ')

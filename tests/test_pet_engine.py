@@ -76,6 +76,19 @@ def test_care_effects_cooldowns_and_waking_is_not_care():
         game.apply(sleeping, 'wake', 1009)
     awake = game.apply(sleeping, 'wake', 1010)
     assert awake['sleeping'] == 0 and awake['last_care_at'] == 1000
+    assert awake['energy'] == row['energy']
+
+
+def test_full_hour_sleep_has_no_partial_reward_then_wakes_and_decays():
+    row=game.apply(initial(),'sleep',1000)
+    assert row['sleep_ends_at']==4600
+    partial=game.project(row,4599)
+    assert partial['sleeping']==1 and partial['energy']==game.INITIAL
+    full=game.project(row,4600)
+    assert full['sleeping']==0 and full['energy']==game.MAX_STAT and full['sleep_ends_at'] is None
+    later=game.project(row,8200)
+    assert (later['energy'],later['satiety'],later['mood'])==(97*game.UNIT,74*game.UNIT,78*game.UNIT)
+    assert full['last_care_at']==1000
 
 
 @pytest.mark.parametrize('patch,action', [({'satiety': game.MAX_STAT}, 'feed'),

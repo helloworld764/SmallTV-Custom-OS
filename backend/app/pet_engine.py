@@ -8,6 +8,7 @@ RETURN_SECONDS = 24 * 3600
 MAX_ELAPSED = 24 * 3600
 REACTION_SECONDS = 3
 REACTION_TTL_SECONDS = 60
+SLEEP_SECONDS = 3600
 
 
 class GameError(Exception):
@@ -24,6 +25,8 @@ def project(row, timestamp):
     disappeared = row['last_care_at'] + NEGLECT_SECONDS
     result['disappeared_at'] = disappeared
     result['return_available_at'] = disappeared + RETURN_SECONDS
+    sleep_end = (row['sleep_at'] if row['sleep_at'] is not None else row['updated_at']) + SLEEP_SECONDS if row['sleeping'] else None
+    result['sleep_ends_at'] = sleep_end
     if result['clock_state'] == 'UNKNOWN':
         result['lifecycle'] = 'UNKNOWN'
     elif timestamp >= result['return_available_at']:
@@ -34,9 +37,15 @@ def project(row, timestamp):
         result['lifecycle'] = 'ACTIVE'
     if result['clock_state'] == 'OK':
         elapsed = min(timestamp - row['updated_at'], MAX_ELAPSED)
-        result['satiety'] = max(0, row['satiety'] - elapsed * (2 if row['sleeping'] else 4))
-        result['energy'] = min(MAX_STAT, row['energy'] + elapsed * 20) if row['sleeping'] else max(0, row['energy'] - elapsed * 3)
-        result['mood'] = row['mood'] if row['sleeping'] else max(0, row['mood'] - elapsed * 2)
+        sleep_elapsed = min(elapsed, max(0, sleep_end-row['updated_at'])) if sleep_end is not None else 0
+        awake_elapsed = elapsed-sleep_elapsed
+        finished = sleep_end is not None and timestamp >= sleep_end
+        result['satiety'] = max(0, row['satiety'] - sleep_elapsed*2 - awake_elapsed*4)
+        result['energy'] = max(0, (MAX_STAT if finished else row['energy']) - awake_elapsed*3)
+        result['mood'] = max(0, row['mood'] - awake_elapsed*2)
+        if finished:
+            result['sleeping'] = 0
+            result['sleep_ends_at'] = None
     return result
 
 
@@ -48,7 +57,7 @@ def apply(row, action, timestamp):
         if state['lifecycle'] != 'RETURN_AVAILABLE':
             raise GameError('Pet return is not available yet')
         state.update(satiety=INITIAL, energy=INITIAL, mood=INITIAL, sleeping=0,
-                     last_care_at=timestamp, round=row['round'] + 1, feed_at=None, play_at=None, sleep_at=None)
+                     last_care_at=timestamp, round=row['round'] + 1, feed_at=None, play_at=None, sleep_at=None, sleep_ends_at=None)
     else:
         if state['lifecycle'] != 'ACTIVE':
             raise GameError('Pet is absent; wait until return is available')
@@ -70,10 +79,12 @@ def apply(row, action, timestamp):
             if state['sleeping'] or state['energy'] == MAX_STAT:
                 raise GameError('Pet does not need to start sleeping')
             state['sleeping'] = 1
+            state['sleep_ends_at'] = timestamp+SLEEP_SECONDS
         elif action == 'wake':
             if not state['sleeping']:
                 raise GameError('Pet is already awake')
             state['sleeping'] = 0
+            state['sleep_ends_at'] = None
         else:
             raise GameError('Unsupported pet action')
         state[field] = timestamp

@@ -165,12 +165,15 @@ def dispatch(connection, link, text, now):
                 return 'Неизвестная настройка.', MENU
             connection.execute('INSERT INTO telegram_preferences(user_id) VALUES (?) ON CONFLICT(user_id) DO NOTHING', (uid,))
             connection.execute(f'UPDATE telegram_preferences SET {key}=1-{key} WHERE user_id=?', (uid,))
+            if key in ('enabled','pet'):
+                since = 'enabled_since' if key == 'enabled' else 'pet_enabled_since'
+                connection.execute(f'UPDATE telegram_preferences SET {since}=CASE WHEN {key}=1 THEN ? ELSE NULL END WHERE user_id=?',(now,uid))
         pref = preferences(connection, uid)
         rows = [[('Выключить все' if pref['enabled'] else 'Включить уведомления', 'notify:enabled')]]
         rows += [[(('✓ ' if pref[key] else '— ')+LABELS[key], 'notify:'+key)] for key in CATEGORIES]
         status = '🔔 Уведомления включены.' if pref['enabled'] else '🔕 Все уведомления выключены.'
         return (status+'\n\nГалочки — сохранённый выбор категорий. Общий выключатель временно отключает все категории, сохраняя выбор.'
-                '\n\nДоставка событий появится следующим этапом.'), buttons(rows)
+                '\n\nСейчас отправляется уведомление о завершении полного сна. Остальные события будут подключены позже.'), buttons(rows)
     if text == 'unlink-confirm':
         return 'Отключить этот Telegram от аккаунта?', buttons([[('Да, отключить', 'unlink'), ('Отмена', 'settings')]])
     if text == 'unlink':

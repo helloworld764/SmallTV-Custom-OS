@@ -443,3 +443,121 @@ def test_unlink_clears_pet_drafts_and_action_intents(env):
         assert c.execute('SELECT count(*) FROM telegram_pet_intents').fetchone()[0]==0
     _,denied=apply(env,pet_button(reply,'Кормить'),callback=True,now=now)
     assert denied['photo_asset'] is None
+
+
+def test_timed_sleep_card_api_and_early_wake_give_no_partial_energy(env,monkeypatch):
+    from backend.app import pets
+    from backend.app.pet_sleep import complete_due_sleeps
+    link(env); start=int(time.time()); clock=[start]; monkeypatch.setattr(pets,'now',lambda:clock[0])
+    reply=adopt_in_bot(env,start)
+    _,asleep=apply(env,pet_button(reply,'Спать'),callback=True,now=start)
+    assert 'Проснётся через 60 мин 0 сек' in asleep['text']
+    clock[0]=start+1800
+    before=env['api'].get('/api/v1/pets/current').json()
+    assert before['energy']==80 and before['sleep_ends_at']==start+3600
+    _,refreshed=apply(env,'/pet',now=clock[0])
+    assert '30 мин 0 сек' in refreshed['text']
+    apply(env,pet_button(refreshed,'Разбудить'),callback=True,now=clock[0])
+    after=env['api'].get('/api/v1/pets/current').json()
+    assert after['energy']==80 and after['sleeping'] is False and after['sleep_ends_at'] is None
+    complete_due_sleeps(env['db'],start+3600)
+    with env['db'].connection() as c:
+        assert c.execute('SELECT status FROM pet_sleep_sessions').fetchone()[0]=='cancelled'
+        assert c.execute("SELECT count(*) FROM telegram_replies WHERE notification_category='pet'").fetchone()[0]==0
+
+
+def start_timed_sleep(env,now,enabled=True,category=True):
+    link(env); reply=adopt_in_bot(env,now)
+    apply(env,pet_button(reply,'Спать'),callback=True,now=now)
+    with env['db'].transaction() as c:
+        c.execute('INSERT INTO telegram_preferences(user_id,enabled,pet) VALUES (?,?,?)',(env['owner'],int(enabled),int(category)))
+        c.execute('DELETE FROM telegram_replies')
+
+
+def test_sleep_finishes_without_worker_and_completion_queues_once_without_rebasing_game(env,monkeypatch):
+    from backend.app import pets
+    from backend.app.pet_sleep import complete_due_sleeps
+    start=int(time.time()); start_timed_sleep(env,start)
+    clock=[start+3600]; monkeypatch.setattr(pets,'now',lambda:clock[0])
+    before=env['api'].get('/api/v1/pets/current').json()
+    assert before['sleeping'] is False and before['energy']==100 and before['reaction']['kind']=='WAKE'
+    assert before['last_care_at']==start
+    complete_due_sleeps(env['db'],start+3599)
+    complete_due_sleeps(env['db'],clock[0])
+    complete_due_sleeps(env['db'],clock[0])
+    assert env['api'].get('/api/v1/pets/current').json()==before
+    with env['db'].connection() as c:
+        assert c.execute("SELECT count(*) FROM telegram_replies WHERE notification_category='pet'").fetchone()[0]==1
+        assert c.execute('SELECT status FROM pet_sleep_sessions').fetchone()[0]=='completed'
+    client=FakeTelegram(); deliver_replies(env['db'],client,clock[0]); deliver_replies(env['db'],client,clock[0])
+    assert len(client.calls)==1 and 'час сна завершён' in client.calls[0][1]['text']
+    clock[0]=start+7200
+    assert env['api'].get('/api/v1/pets/current').json()['energy']==97
+
+
+@pytest.mark.parametrize('enabled,category',[(False,True),(True,False),(False,False)])
+def test_sleep_notification_obeys_consent_and_does_not_replay_when_enabled_later(env,enabled,category):
+    from backend.app.pet_sleep import complete_due_sleeps
+    start=int(time.time()); start_timed_sleep(env,start,enabled,category)
+    complete_due_sleeps(env['db'],start+3600)
+    with env['db'].transaction() as c:
+        assert c.execute('SELECT count(*) FROM telegram_replies').fetchone()[0]==0
+        c.execute('UPDATE telegram_preferences SET enabled=1,pet=1')
+    complete_due_sleeps(env['db'],start+3601)
+    with env['db'].connection() as c: assert c.execute('SELECT count(*) FROM telegram_replies').fetchone()[0]==0
+
+
+def test_sleep_pending_notification_rechecks_switches_before_delivery(env):
+    from backend.app.pet_sleep import complete_due_sleeps
+    start=int(time.time()); start_timed_sleep(env,start)
+    complete_due_sleeps(env['db'],start+3600)
+    with env['db'].transaction() as c: c.execute('UPDATE telegram_preferences SET enabled=0')
+    client=FakeTelegram(); deliver_replies(env['db'],client,start+3601)
+    assert client.calls==[]
+
+
+def test_old_sleep_notifications_are_dropped_after_outage(env):
+    from backend.app.pet_sleep import complete_due_sleeps
+    start=int(time.time()); start_timed_sleep(env,start)
+    complete_due_sleeps(env['db'],start+3600+1800)
+    with env['db'].connection() as c:
+        assert c.execute('SELECT count(*) FROM telegram_replies').fetchone()[0]==0
+        assert c.execute('SELECT status FROM pet_sleep_sessions').fetchone()[0]=='completed'
+
+
+def test_restore_keeps_sleep_state_but_cancels_old_notification(env,tmp_path):
+    from backend.app import pets
+    from backend.app.backups import backup_database, restore_database
+    from backend.app.pet_sleep import complete_due_sleeps
+    start=int(time.time()); start_timed_sleep(env,start)
+    snapshot=tmp_path/'sleep-backup.sqlite3'; restored=tmp_path/'sleep-restored.sqlite3'
+    backup_database(env['db'].path,snapshot)
+    restore_database(snapshot,restored,active_database=env['db'].path)
+    database=Database(restored)
+    complete_due_sleeps(database,start+3600)
+    with database.connection() as c:
+        assert c.execute('SELECT status FROM pet_sleep_sessions').fetchone()[0]=='cancelled'
+        assert c.execute('SELECT count(*) FROM telegram_replies').fetchone()[0]==0
+        pet=pets.view(pets.find_pet(c,env['owner']),start+3600)
+        assert pet.energy==100 and pet.sleeping is False and pet.last_care_at==start
+
+
+@pytest.mark.parametrize('key',['enabled','pet'])
+def test_enabling_after_sleep_deadline_does_not_replay_event_after_worker_outage(env,key):
+    from backend.app.pet_sleep import complete_due_sleeps
+    start=int(time.time()); start_timed_sleep(env,start)
+    apply(env,'notify:'+key,callback=True,now=start+3500)
+    apply(env,'notify:'+key,callback=True,now=start+3610)
+    complete_due_sleeps(env['db'],start+3620)
+    with env['db'].connection() as c:
+        assert c.execute("SELECT count(*) FROM telegram_replies WHERE notification_category='pet'").fetchone()[0]==0
+
+
+def test_queued_sleep_notice_does_not_survive_switching_off_then_on(env):
+    from backend.app.pet_sleep import complete_due_sleeps
+    start=int(time.time()); start_timed_sleep(env,start)
+    complete_due_sleeps(env['db'],start+3600)
+    apply(env,'notify:enabled',callback=True,now=start+3601)
+    apply(env,'notify:enabled',callback=True,now=start+3602)
+    client=FakeTelegram(); deliver_replies(env['db'],client,start+3603)
+    assert not any('час сна завершён' in payload.get('text','') for _,payload in client.calls)

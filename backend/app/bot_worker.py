@@ -9,10 +9,11 @@ import time
 
 from .bot_handler import process_update
 from .bot_pets import photo_path
+from .pet_sleep import complete_due_sleeps
 from .bot_transport import TelegramClient, TelegramError
 from .config import Settings
 from .database import Database
-from .telegram import active_link
+from .telegram import active_link, notification_allowed
 
 
 @contextmanager
@@ -64,6 +65,8 @@ def deliver_replies(database, client, now=None):
         with database.connection() as connection:
             link = active_link(connection, row['telegram_id'])
             allowed = row['user_id'] is None or (link and link['user_id'] == row['user_id'])
+            if row['notification_category']:
+                allowed = allowed and notification_allowed(connection,row['user_id'],row['notification_category'],row['notification_at'])
         if row['expires_at'] > now and allowed:
             try:
                 photo = photo_path(row['photo_asset'])
@@ -83,6 +86,7 @@ def deliver_replies(database, client, now=None):
 
 
 def poll_once(database, settings, client):
+    complete_due_sleeps(database)
     deliver_replies(database, client)
     with database.connection() as connection:
         offset = connection.execute('SELECT next_offset FROM telegram_worker_state WHERE id=1').fetchone()[0]
@@ -101,6 +105,7 @@ def poll_once(database, settings, client):
                 client.call('answerCallbackQuery', {'callback_query_id': callback})
             except TelegramError:
                 pass
+    complete_due_sleeps(database)
     deliver_replies(database, client)
 
 
