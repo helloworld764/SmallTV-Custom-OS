@@ -69,5 +69,9 @@ input:not([type=range]), select { width: 100%; padding: 12px 13px; border-radius
 .page-footer { border-top: 1px solid #24262d; padding: 24px max(24px, calc((100vw - 1160px) / 2)); display: flex; justify-content: space-between; gap: 16px; color: #898c99; font-size: 11px; }
 #connection[data-state=online] { color: #9db5a9; }#connection[data-state=offline] { color: #ff9aa5; }
 .help { max-width: 760px; padding: 36px; margin: 40px auto; }.help h1 { font-size: 30px; }.help p { color: #c0c2cb; }.help pre { overflow-x: auto; background: #0b0c10; border-radius: 8px; padding: 18px; font-size: 12px; }
+.enrollment-dialog { color: inherit; width: min(560px, calc(100% - 32px)); max-height: calc(100dvh - 40px); padding: 28px; overflow-y: auto; }
+.enrollment-dialog::backdrop { background: #000a; }
+#enrollment-secret { display: block; overflow-wrap: anywhere; user-select: all; padding: 14px; border: 1px solid var(--border); border-radius: 8px; }
+#enrollment-result { font-size: 14px; overflow-wrap: anywhere; }
 @media(max-width: 1210px) { main { padding: 28px 24px 48px; }.login-layout { gap: 48px; padding-inline: 12px; } }
 @media(max-width: 760px) { .topbar { height: 72px; }.brand-caption { display:none; }.brand { font-size: 20px; }.simulator-link { font-size: 11px; }.login-layout { grid-template-columns: 1fr; gap: 26px; padding: 10px 0; }.intro h1 { font-size: 32px; }.display-motif, .intro-note { display:none; }.lead { margin-bottom: 0; }.login-card { padding: 25px; }.dashboard-heading { align-items:start; flex-direction:column; }.account { width:100%; justify-content:space-between; }.workspace { grid-template-columns: 1fr; }.settings-card { padding:24px; }.weather-form-row { align-items: stretch; flex-direction: column; }.save-row { gap: 8px; flex-direction:column; }.page-footer { flex-direction:column; }h1 { font-size:29px; } }

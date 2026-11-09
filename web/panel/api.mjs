@@ -55,6 +55,33 @@ export class ApiClient {
   async settings(id) {
     return settingsData(await this.request(`/api/v1/devices/${encodeURIComponent(id)}/settings`), id);
   }
+  async createPreview(name, requestId, csrf) {
+    const value = await this.request('/api/v1/devices/previews', {
+      method: 'POST', body: { name, request_id: requestId }, headers: { 'X-CSRF-Token': csrf },
+    });
+    if (!value || typeof value.id !== 'string' || value.name !== name || value.is_preview !== true) throw new ApiError(502, 'protocol');
+    return value;
+  }
+  async enrollmentCode(name, csrf) {
+    const value = await this.request('/api/v1/devices/enrollment-codes', {
+      method: 'POST', body: { name }, headers: { 'X-CSRF-Token': csrf },
+    });
+    if (!value || typeof value.id !== 'string' || !/^smalltv_enroll_[A-Za-z0-9_-]{32}$/.test(value.code)
+        || value.expires_in !== 300 || !Number.isInteger(value.expires_at)) throw new ApiError(502, 'protocol');
+    return value;
+  }
+  async enrollmentStatus(id) {
+    const value = await this.request(`/api/v1/devices/enrollment-codes/${encodeURIComponent(id)}`);
+    if (!value || value.id !== id || !['pending', 'enrolled', 'expired', 'closed'].includes(value.state)
+        || !Number.isInteger(value.expires_in) || value.expires_in < 0 || value.expires_in > 300
+        || (value.state === 'enrolled' && typeof value.device_id !== 'string')) throw new ApiError(502, 'protocol');
+    return value;
+  }
+  cancelEnrollment(id, csrf) {
+    return this.request(`/api/v1/devices/enrollment-codes/${encodeURIComponent(id)}`, {
+      method: 'DELETE', headers: { 'X-CSRF-Token': csrf },
+    });
+  }
   async currentPet() { return this.request('/api/v1/pets/current'); }
   async weatherPreference() {
     const value = await this.request('/api/v1/preferences/weather');

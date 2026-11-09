@@ -6,6 +6,7 @@ import { ApiClient, ApiError } from '../web/panel/api.mjs';
 import { PreviewSettings } from '../web/simulator/preview.mjs';
 import { checkHealth } from '../web/simulator/connection.mjs';
 import { Notifications, readNotifications } from '../web/simulator/notifications.mjs';
+import { EnrollmentFlow } from '../web/panel/enrollment.mjs';
 
 const { base, password } = JSON.parse(readFileSync(0, 'utf8'));
 const cookies = new Map();
@@ -29,6 +30,16 @@ const session = await client.login('integration-user', password);
 assert.equal((await client.session()).user.id, session.user.id);
 const devices = await client.devices();
 assert.deepEqual(devices.map(device => device.id), ['integration-tv']);
+const wizard = new EnrollmentFlow(client, { uuid: randomUUID });
+const localPreview = await wizard.createPreview('HTTP local preview', session.csrf_token);
+assert.equal(localPreview.is_preview, true);
+assert.equal((await wizard.createPreview('HTTP local preview', session.csrf_token)).id, localPreview.id);
+assert.equal((await client.request(`/api/v1/devices/${localPreview.id}/presence`)).state, 'UNKNOWN');
+await client.save(localPreview.id, { start_screen: 'tamagotchi' }, session.csrf_token);
+const localSettings = new PreviewSettings(localPreview.id);
+localSettings.apply(await client.settings(localPreview.id), Date.now());
+assert.equal(localSettings.settings.start_screen, 'tamagotchi');
+wizard.reset();
 const preview = new PreviewSettings('integration-tv');
 preview.apply(await client.settings('integration-tv'), Date.now());
 assert.equal(preview.theme, 'red');
@@ -58,10 +69,15 @@ assert.ok(petState.satiety > 99 && petState.satiety <= 100);
 assert.equal(petState.reaction.id, petAction.action_id);
 await assert.rejects(client.settings('foreign-tv'), error => error.status === 404);
 await checkHealth(fetcher, new AbortController().signal);
-const pairing = await client.request('/api/v1/devices/enrollment-codes', {
-  method: 'POST', body: { name: 'HTTP software client' }, headers: { 'X-CSRF-Token': session.csrf_token },
-});
+const pairing = await wizard.issue('HTTP software client', session.csrf_token);
+assert.equal((await wizard.check()).state, 'pending');
 const deviceCredential = await client.request('/api/v1/devices/enroll', { method: 'POST', body: { code: pairing.code } });
+assert.equal((await wizard.check()).device_id, deviceCredential.device_id);
+assert.equal(wizard.code.code, '');
+wizard.reset();
+await wizard.issue('HTTP cancelled client', session.csrf_token);
+await wizard.cancel(session.csrf_token);
+assert.equal(wizard.code, null);
 const statePath = `/api/v1/devices/${deviceCredential.device_id}/state`;
 const deviceAuth = { Authorization: `Bearer ${deviceCredential.token}` };
 const deviceState = await client.request(statePath, { headers: deviceAuth });
@@ -120,7 +136,7 @@ assert.equal((await client.request(runPath)).last_reported_state, 'DONE');
 await assert.rejects(client.request('/api/v1/agents/codex/heartbeat', {
   method: 'POST', body: {}, headers: agentAuth,
 }), error => error.status === 401);
-for (const path of ['/panel/', '/simulator/?device=integration-tv', '/simulator/preview.mjs', '/simulator/notifications.mjs', '/shared/site-theme.mjs', '/shared/site-theme.css']) {
+for (const path of ['/panel/', '/panel/enrollment.mjs', '/simulator/?device=integration-tv', '/simulator/preview.mjs', '/simulator/notifications.mjs', '/shared/site-theme.mjs', '/shared/site-theme.css']) {
   assert.equal((await fetcher(path)).status, 200);
 }
 await client.logout(session.csrf_token);

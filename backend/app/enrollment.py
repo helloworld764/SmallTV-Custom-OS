@@ -1,14 +1,14 @@
 """Software enrollment only; no claims about hardware identity or compatibility."""
 
 import secrets
-from typing import Annotated
-from uuid import uuid4
+from typing import Annotated, Literal
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
-from .auth import Principal, now, write_user
+from .auth import Principal, current_user, now, write_user
 from .security import token_hash
 
 
@@ -25,6 +25,28 @@ class CodeView(BaseModel):
     id: str
     code: str
     expires_at: int
+    expires_in: int = 300
+
+
+class CodeStatus(BaseModel):
+    id: str
+    name: str
+    state: Literal['pending', 'enrolled', 'expired', 'closed']
+    device_id: str | None
+    expires_at: int
+    expires_in: int
+
+
+class PreviewRequest(EnrollmentRequest):
+    request_id: UUID
+
+
+class PreviewView(BaseModel):
+    id: str
+    owner_id: str
+    name: str
+    created_at: str
+    is_preview: bool = True
 
 
 class RedeemRequest(BaseModel):
@@ -48,6 +70,48 @@ def owned_device(connection, device_id: str, principal: Principal):
     if row is None:
         raise HTTPException(404, 'Device not found')
     return row
+
+
+@router.post('/previews', response_model=PreviewView, status_code=201)
+def create_preview(payload: PreviewRequest, request: Request, response: Response,
+                   principal: Annotated[Principal, Depends(write_user)]):
+    """A session-only display preview; explicit and idempotent, never a device login."""
+    owner, request_id, timestamp = principal.user.id, str(payload.request_id), now()
+    with request.app.state.database.transaction() as connection:
+        previous = connection.execute('''SELECT devices.* FROM device_previews
+            JOIN devices ON devices.id = device_previews.device_id
+            WHERE device_previews.owner_id = ? AND request_id = ?''', (owner, request_id)).fetchone()
+        if previous is not None:
+            if previous['name'] != payload.name:
+                raise HTTPException(409, 'Request identifier already used with another name')
+            response.status_code = 200
+            return dict(previous)
+        count = connection.execute('SELECT COUNT(*) FROM device_previews WHERE owner_id = ? AND created_at > ?',
+                                   (owner, timestamp - 60)).fetchone()[0]
+        if count >= 5:
+            raise HTTPException(429, 'Too many previews', headers={'Retry-After': '60'})
+        identifier = str(uuid4())
+        connection.execute('INSERT INTO devices(id, owner_id, name) VALUES (?, ?, ?)', (identifier, owner, payload.name))
+        connection.execute('INSERT INTO device_settings(device_id) VALUES (?)', (identifier,))
+        connection.execute('INSERT INTO device_previews VALUES (?, ?, ?, ?)', (identifier, request_id, owner, timestamp))
+        audit(connection, owner, 'device.preview.created', identifier)
+        return dict(connection.execute('SELECT * FROM devices WHERE id = ?', (identifier,)).fetchone())
+
+
+@router.get('/enrollment-codes/{code_id}', response_model=CodeStatus)
+def code_status(code_id: str, request: Request, principal: Annotated[Principal, Depends(current_user)]):
+    with request.app.state.database.connection() as connection:
+        row = connection.execute('''SELECT * FROM device_enrollment_codes
+            WHERE id = ? AND (owner_id = ? OR ? = 'super_admin')''',
+            (code_id, principal.user.id, principal.user.role)).fetchone()
+    if row is None:
+        raise HTTPException(404, 'Enrollment code not found')
+    # Legacy consumed codes have no device mapping: don't call them cancelled.
+    state = ('enrolled' if row['device_id'] else 'closed' if row['consumed_at'] is not None
+             else 'expired' if row['expires_at'] <= now() else 'pending')
+    return CodeStatus(id=row['id'], name=row['device_name'], state=state,
+                      device_id=row['device_id'], expires_at=row['expires_at'],
+                      expires_in=max(0, row['expires_at'] - now()) if state == 'pending' else 0)
 
 
 @router.post('/enrollment-codes', response_model=CodeView, status_code=201)
@@ -109,7 +173,8 @@ def enroll(payload: RedeemRequest, request: Request):
                            (device_id, code['owner_id'], code['device_name']))
         connection.execute('INSERT INTO device_settings (device_id) VALUES (?)', (device_id,))
         connection.execute('INSERT INTO device_credentials VALUES (?, ?, ?, NULL)', (device_id, token_hash(token), timestamp))
-        connection.execute('UPDATE device_enrollment_codes SET consumed_at = ? WHERE id = ?', (timestamp, code['id']))
+        connection.execute('UPDATE device_enrollment_codes SET consumed_at = ?, device_id = ? WHERE id = ?',
+                           (timestamp, device_id, code['id']))
         audit(connection, code['owner_id'], 'device.enrolled', device_id)
     return CredentialView(device_id=device_id, token=token)
 
@@ -165,6 +230,8 @@ def rotate(device_id: str, request: Request, principal: Annotated[Principal, Dep
     token = 'smalltv_device_' + secrets.token_urlsafe(32)
     with request.app.state.database.transaction() as connection:
         owned_device(connection, device_id, principal)
+        if connection.execute('SELECT 1 FROM device_previews WHERE device_id = ?', (device_id,)).fetchone():
+            raise HTTPException(409, 'A preview does not use device credentials')
         connection.execute('''INSERT INTO device_credentials VALUES (?, ?, ?, NULL)
             ON CONFLICT(device_id) DO UPDATE SET token_hash = excluded.token_hash,
             created_at = excluded.created_at, revoked_at = NULL''', (device_id, token_hash(token), now()))

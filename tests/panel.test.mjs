@@ -1,11 +1,122 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { ApiClient, ApiError, changesFrom, hasDraftChanges } from '../web/panel/api.mjs';
+import { EnrollmentFlow } from '../web/panel/enrollment.mjs';
 
 const csrf = 'a'.repeat(64); // Deliberately synthetic, not a credential.
 const session = { user: { id: 'user-test', display_name: 'Test', role: 'user' }, csrf_token: csrf };
 const settings = { device_id: 'device-test', brightness: 70, theme: 'BlackArch Red', start_screen: 'clock' };
 const reply = (value, status = 200) => ({ ok: status < 400, status, json: async () => value });
+
+test('wizard API uses session CSRF, JSON bodies and encodes only resource ids in URLs', async () => {
+  const calls = [];
+  const code = { id: 'code-test', code: 'smalltv_enroll_' + 'x'.repeat(32), expires_at: 1000, expires_in: 300 };
+  const client = new ApiClient({ fetcher: async (path, options) => {
+    calls.push([path, options.method, options.headers['X-CSRF-Token'], options.body && JSON.parse(options.body)]);
+    return reply(path.endsWith('/previews') ? { id: 'preview-test', name: 'Preview', is_preview: true }
+      : options.method === 'POST' ? code : { id: 'code/?', state: 'enrolled', device_id: 'test-device', expires_in: 0 },
+    options.method === 'DELETE' ? 204 : 200);
+  } });
+  await client.createPreview('Preview', 'request-id', csrf);
+  assert.equal((await client.enrollmentCode('Client', csrf)).code, code.code);
+  assert.equal((await client.enrollmentStatus('code/?')).device_id, 'test-device');
+  await client.cancelEnrollment('code/?', csrf);
+  assert.deepEqual(calls, [
+    ['/api/v1/devices/previews', 'POST', csrf, { name: 'Preview', request_id: 'request-id' }],
+    ['/api/v1/devices/enrollment-codes', 'POST', csrf, { name: 'Client' }],
+    ['/api/v1/devices/enrollment-codes/code%2F%3F', 'GET', undefined, undefined],
+    ['/api/v1/devices/enrollment-codes/code%2F%3F', 'DELETE', csrf, undefined],
+  ]);
+  assert.ok(calls.every(([url]) => !url.includes(code.code)));
+});
+
+test('wizard rejects malformed success responses', async () => {
+  for (const value of [null, {}, { id: 'id', name: 'wrong', is_preview: true }]) {
+    const client = new ApiClient({ fetcher: async () => reply(value) });
+    await assert.rejects(client.createPreview('Preview', 'request-id', csrf), error => error.kind === 'protocol');
+    await assert.rejects(client.enrollmentCode('Preview', csrf), error => error.kind === 'protocol');
+    await assert.rejects(client.enrollmentStatus('id'), error => error.kind === 'protocol');
+  }
+  const client = new ApiClient({ fetcher: async () => reply({ id: 'id', state: 'enrolled', expires_in: 0 }) });
+  await assert.rejects(client.enrollmentStatus('id'), error => error.kind === 'protocol');
+});
+
+test('explicit preview retry keeps its id after a lost response', async () => {
+  const ids = [];
+  const flow = new EnrollmentFlow({ createPreview: async (name, id) => {
+    ids.push(id);
+    if (ids.length === 1) throw new ApiError(0, 'timeout');
+    return { id: 'new-device', name, is_preview: true };
+  } }, { uuid: () => 'fixed-request-id' });
+  await assert.rejects(flow.createPreview('Preview', csrf));
+  assert.equal((await flow.createPreview('Preview', csrf)).id, 'new-device');
+  assert.deepEqual(ids, ['fixed-request-id', 'fixed-request-id']);
+});
+
+test('enrollment countdown subtracts network latency and clears the expired secret', async () => {
+  let time = 1000;
+  const flow = new EnrollmentFlow({ enrollmentCode: async () => {
+    time += 3000;
+    return { id: 'test', code: 'synthetic', expires_in: 300 };
+  } }, { clock: () => time });
+  await flow.issue('Client', csrf);
+  assert.equal(flow.remaining(), 297);
+  time = 301000;
+  assert.equal(flow.remaining(), 0);
+  assert.equal(flow.code.code, '');
+  assert.equal(flow.code.id, 'test');
+});
+
+test('pending, enrolled, expired and legacy closed enrollment states are distinguished', async () => {
+  for (const state of ['pending', 'enrolled', 'expired', 'closed']) {
+    const flow = new EnrollmentFlow({
+      enrollmentCode: async () => ({ id: 'test', code: 'synthetic', expires_in: 300 }),
+      enrollmentStatus: async () => ({ id: 'test', state, expires_in: state === 'pending' ? 10 : 0 }),
+    }, { clock: () => 0 });
+    await flow.issue('Client', csrf);
+    assert.equal((await flow.check()).state, state);
+    assert.equal(flow.code.code, state === 'pending' ? 'synthetic' : '');
+    assert.equal(flow.remaining(), state === 'pending' ? 10 : 0);
+  }
+});
+
+test('failed cancellation hides the secret but retains id for explicit retry', async () => {
+  let calls = 0;
+  const flow = new EnrollmentFlow({
+    enrollmentCode: async () => ({ id: 'test', code: 'synthetic', expires_in: 300 }),
+    cancelEnrollment: async id => { assert.equal(id, 'test'); if (++calls === 1) throw new ApiError(0); },
+  });
+  await flow.issue('Client', csrf);
+  await assert.rejects(flow.cancel(csrf));
+  assert.equal(flow.code.code, '');
+  assert.equal(flow.code.id, 'test');
+  await flow.cancel(csrf);
+  assert.equal(flow.code, null);
+  assert.equal(calls, 2);
+});
+
+test('account reset discards delayed code, preview and status responses', async () => {
+  for (const operation of ['issue', 'createPreview', 'check']) {
+    let finish;
+    const deferred = () => new Promise(resolve => { finish = resolve; });
+    const flow = new EnrollmentFlow({ enrollmentCode: deferred, createPreview: deferred, enrollmentStatus: deferred }, { uuid: () => 'request-id' });
+    if (operation === 'check') flow.code = { id: 'test', code: 'synthetic' };
+    const promise = flow[operation]('Client', csrf);
+    flow.reset();
+    finish({ id: 'test', code: 'synthetic', state: 'pending', expires_in: 300 });
+    assert.equal(await promise, null);
+    assert.equal(flow.code, null);
+    assert.equal(flow.preview, null);
+  }
+});
+
+test('lost code issue response is not retried automatically or treated as a registration', async () => {
+  let calls = 0;
+  const flow = new EnrollmentFlow({ enrollmentCode: async () => { calls++; throw new ApiError(0); } });
+  await assert.rejects(flow.issue('Client', csrf));
+  assert.equal(calls, 1);
+  assert.equal(flow.code, null);
+});
 
 test('Telegram linking uses private API calls with CSRF and never URL credentials', async () => {
   const calls = [];

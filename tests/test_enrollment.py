@@ -1,6 +1,7 @@
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 import secrets
+from uuid import uuid4
 
 from fastapi.testclient import TestClient
 import pytest
@@ -8,7 +9,7 @@ import pytest
 from backend.app import enrollment
 from backend.app.backups import backup_database, restore_database
 from backend.app.config import Settings
-from backend.app.database import Database
+from backend.app.database import Database, MIGRATIONS
 from backend.app.main import create_app
 from backend.app.security import create_account, token_hash
 
@@ -40,6 +41,150 @@ def redeem(env, code):
 
 def device_header(credential):
     return {'Authorization': 'Bearer ' + credential['token']}
+
+
+def test_preview_creation_is_explicit_private_and_has_no_device_login(env):
+    client, database, csrf, owner, _, _ = env
+    assert client.get('/api/v1/devices').json() == []
+    payload = {'name': '  Local preview  ', 'request_id': str(uuid4())}
+    response = client.post('/api/v1/devices/previews', headers=csrf, json=payload)
+    assert response.status_code == 201
+    assert response.headers['cache-control'] == 'no-store'
+    preview = response.json()
+    assert preview['owner_id'] == owner and preview['name'] == 'Local preview'
+    assert preview['is_preview'] is True and 'token' not in preview
+    identifier = preview['id']
+    assert client.get(f'/api/v1/devices/{identifier}').json() == preview
+    assert client.get('/api/v1/devices').json() == [preview]
+    assert client.get(f'/api/v1/devices/{identifier}/presence').json()['state'] == 'UNKNOWN'
+    assert client.get(f'/api/v1/devices/{identifier}/state').status_code == 401
+    assert client.post(f'/api/v1/devices/{identifier}/credentials/rotate', headers=csrf).status_code == 409
+    assert client.patch(f'/api/v1/devices/{identifier}/settings', headers=csrf,
+                        json={'start_screen': 'tamagotchi'}).status_code == 200
+    with database.connection() as connection:
+        assert connection.execute('SELECT COUNT(*) FROM device_credentials').fetchone()[0] == 0
+        assert connection.execute('SELECT COUNT(*) FROM device_presence').fetchone()[0] == 0
+        assert connection.execute("SELECT COUNT(*) FROM audit_log WHERE action = 'device.preview.created'").fetchone()[0] == 1
+
+
+def test_preview_retry_and_concurrent_creation_are_idempotent(env):
+    client, database, csrf, *_ = env
+    payload = {'name': 'Preview', 'request_id': str(uuid4())}
+    def create(_):
+        return client.post('/api/v1/devices/previews', headers=csrf, json=payload)
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        replies = list(pool.map(create, range(4)))
+    assert sorted(reply.status_code for reply in replies) == [200, 200, 200, 201]
+    assert len({reply.json()['id'] for reply in replies}) == 1
+    assert client.post('/api/v1/devices/previews', headers=csrf, json={**payload, 'name': 'Changed'}).status_code == 409
+    database.initialize()
+    assert create(None).json() == replies[0].json()
+    with database.connection() as connection:
+        assert connection.execute('SELECT COUNT(*) FROM devices').fetchone()[0] == 1
+
+
+@pytest.mark.parametrize('payload', [
+    {'name': ' ', 'request_id': str(uuid4())}, {'name': 'x' * 81, 'request_id': str(uuid4())},
+    {'name': 'Test', 'request_id': 'invalid'}, {'name': 'Test'},
+    {'name': 'Test', 'request_id': str(uuid4()), 'owner_id': 'other'},
+])
+def test_preview_rejects_invalid_payload_and_owner_injection(env, payload):
+    assert env[0].post('/api/v1/devices/previews', headers=env[2], json=payload).status_code == 422
+
+
+def test_preview_requires_session_csrf_and_enforces_rate_limit(env, monkeypatch):
+    client, _, csrf, *_ = env
+    payload = {'name': 'Preview', 'request_id': str(uuid4())}
+    assert client.post('/api/v1/devices/previews', json=payload).status_code == 403
+    with monkeypatch.context() as patch:
+        patch.setattr(enrollment, 'now', lambda: 10000)
+        for index in range(5):
+            body = payload if index == 0 else {**payload, 'request_id': str(uuid4())}
+            assert client.post('/api/v1/devices/previews', headers=csrf, json=body).status_code == 201
+        assert client.post('/api/v1/devices/previews', headers=csrf, json=payload).status_code == 200
+        limited = client.post('/api/v1/devices/previews', headers=csrf, json={**payload, 'request_id': str(uuid4())})
+        assert limited.status_code == 429 and limited.headers['retry-after'] == '60'
+        patch.setattr(enrollment, 'now', lambda: 10060)
+        assert client.post('/api/v1/devices/previews', headers=csrf, json={**payload, 'request_id': str(uuid4())}).status_code == 201
+    client.cookies.clear()
+    assert client.post('/api/v1/devices/previews', headers=csrf, json=payload).status_code == 401
+
+
+def test_enrollment_status_lifecycle_never_reveals_secret(env, monkeypatch):
+    client, _, csrf, *_ = env
+    code = issue(env)
+    path = '/api/v1/devices/enrollment-codes/' + code['id']
+    response = client.get(path)
+    assert response.status_code == 200 and response.headers['cache-control'] == 'no-store'
+    assert response.json()['state'] == 'pending'
+    assert 0 < response.json()['expires_in'] <= 300
+    assert 'code' not in response.json() and 'token' not in response.json()
+    with monkeypatch.context() as patch:
+        patch.setattr(enrollment, 'now', lambda: code['expires_at'])
+        assert client.get(path).json()['state'] == 'expired'
+    credential = redeem(env, code['code']).json()
+    status = client.get(path).json()
+    assert status['state'] == 'enrolled' and status['device_id'] == credential['device_id']
+    assert status['expires_in'] == 0
+    # Cancelling after redemption does not undo registration or change its status.
+    assert client.delete(path, headers=csrf).status_code == 204
+    assert client.get(path).json()['state'] == 'enrolled'
+    another = issue(env)
+    path = '/api/v1/devices/enrollment-codes/' + another['id']
+    assert client.delete(path, headers=csrf).status_code == 204
+    assert client.get(path).json()['state'] == 'closed'
+    assert client.get(path).json()['device_id'] is None
+
+
+def test_wizard_isolation_and_request_ids_are_owner_scoped(env):
+    client, _, csrf, _, stranger, password = env
+    payload = {'name': 'Preview', 'request_id': str(uuid4())}
+    preview = client.post('/api/v1/devices/previews', headers=csrf, json=payload).json()
+    code = issue(env)
+    client.cookies.clear()
+    path = '/api/v1/devices/enrollment-codes/' + code['id']
+    assert client.get(path).status_code == 401
+    session = client.post('/api/v1/auth/login', headers={'X-SmallTV-Client': 'web'},
+                          json={'username': 'enroll-other', 'password': password}).json()
+    other_csrf = {'X-CSRF-Token': session['csrf_token']}
+    assert client.get(path).status_code == 404
+    assert client.delete(path, headers=other_csrf).status_code == 404
+    assert client.get('/api/v1/devices/' + preview['id']).status_code == 404
+    assert client.get('/api/v1/devices').json() == []
+    other = client.post('/api/v1/devices/previews', headers=other_csrf, json=payload).json()
+    assert other['id'] != preview['id'] and other['owner_id'] == stranger
+
+
+def test_wizard_migration_preserves_existing_data_and_legacy_consumed_codes(tmp_path):
+    old_sources = tmp_path / 'old-migrations'
+    old_sources.mkdir()
+    for source in sorted(MIGRATIONS.glob('*.sql'))[:13]:
+        (old_sources / source.name).write_bytes(source.read_bytes())
+    database = Database(tmp_path / 'upgrade.sqlite3', old_sources)
+    database.initialize()
+    password = secrets.token_urlsafe(24)
+    owner = create_account(database, 'upgrade-owner', password, 'Owner')
+    with database.transaction() as connection:
+        connection.execute("INSERT INTO devices(id, owner_id, name) VALUES ('legacy-device', ?, 'Existing device')", (owner,))
+        connection.execute("INSERT INTO device_settings(device_id, brightness) VALUES ('legacy-device', 42)")
+        connection.execute('''INSERT INTO device_enrollment_codes
+            (id,code_hash,owner_id,device_name,created_at,expires_at,consumed_at)
+            VALUES ('legacy-code', ?, ?, 'Existing device', 1, 301, 2)''',
+            (token_hash(secrets.token_urlsafe(24)), owner))
+        history = [tuple(row) for row in connection.execute('SELECT * FROM schema_migrations ORDER BY version')]
+    upgraded = Database(database.path)
+    upgraded.initialize()
+    upgraded.initialize()
+    with upgraded.connection() as connection:
+        assert [tuple(row) for row in connection.execute('SELECT * FROM schema_migrations WHERE version <= 13 ORDER BY version')] == history
+        assert connection.execute("SELECT brightness FROM device_settings WHERE device_id = 'legacy-device'").fetchone()[0] == 42
+        assert connection.execute('SELECT COUNT(*) FROM device_previews').fetchone()[0] == 0
+    with TestClient(create_app(Settings(_env_file=None, db_path=database.path))) as client:
+        assert client.post('/api/v1/auth/login', headers={'X-SmallTV-Client': 'web'},
+                           json={'username': 'upgrade-owner', 'password': password}).status_code == 200
+        assert client.get('/api/v1/devices/legacy-device').json()['is_preview'] is False
+        result = client.get('/api/v1/devices/enrollment-codes/legacy-code').json()
+        assert result['state'] == 'closed' and result['device_id'] is None
 
 
 def test_complete_lifecycle_and_hash_only_storage(env):

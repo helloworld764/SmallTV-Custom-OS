@@ -1,7 +1,8 @@
 import { ApiClient, ApiError, changesFrom, hasDraftChanges } from './api.mjs';
+import { EnrollmentFlow } from './enrollment.mjs';
 
 const $ = selector => document.querySelector(selector);
-const state = { session: null, devices: [], selected: null, settings: null, busy: false, more: false };
+const state = { session: null, devices: [], selected: null, settings: null, busy: false, more: false, loaded: 0 };
 let telegramCodeTimer;
 
 function clearTelegramCode() {
@@ -23,6 +24,79 @@ const api = new ApiClient({ onConnection(online) {
   $('#connection').textContent = online ? 'Последний запрос: сервер доступен' : 'Нет связи с сервером';
   $('#connection').dataset.state = online ? 'online' : 'offline';
 } });
+const enrollment = new EnrollmentFlow(api);
+let enrollmentTimer;
+
+function clearEnrollment() {
+  clearInterval(enrollmentTimer);
+  enrollment.reset();
+  $('#enrollment-secret').textContent = '';
+  $('#enrollment-result').textContent = '';
+  $('#enrollment-time').textContent = '';
+  $('#enrollment-code-area').hidden = true;
+  $('#enrollment-form').reset();
+  $('#enrollment-mode').dispatchEvent(new Event('change'));
+  $('#enrollment-dialog').close();
+}
+
+function renderEnrollment() {
+  const hasCode = Boolean(enrollment.code);
+  $('#enrollment-fields').disabled = state.busy || hasCode || Boolean(enrollment.preview);
+  // An ambiguous preview request may be explicitly retried with the same id/name.
+  $('#enrollment-submit').disabled = state.busy || hasCode;
+  if (enrollment.preview) {
+    $('#enrollment-fields').disabled = state.busy;
+    $('#enrollment-name').readOnly = true;
+    $('#enrollment-mode').disabled = true;
+  } else {
+    $('#enrollment-name').readOnly = false;
+    $('#enrollment-mode').disabled = state.busy || hasCode;
+  }
+  $('#enrollment-code-area').hidden = !hasCode;
+  $('#enrollment-check').disabled = state.busy;
+  $('#enrollment-close').disabled = state.busy;
+  $('#enrollment-abandon').hidden = !hasCode;
+  $('#enrollment-abandon').disabled = state.busy;
+  $('#enrollment-close').textContent = hasCode ? 'Отменить код и закрыть' : 'Закрыть';
+  if (hasCode) {
+    const seconds = enrollment.remaining();
+    $('#enrollment-secret').textContent = enrollment.code.code;
+    $('#enrollment-secret').hidden = !enrollment.code.code;
+    $('#enrollment-time').textContent = seconds ? `Срок действия: ещё ${seconds} с.` : 'Код больше не отображается. Проверьте результат подключения.';
+  }
+}
+
+async function showAddedDevice(deviceId) {
+  await loadDevices();
+  // A new UUID may be beyond the first page. Fetch it without loading all devices.
+  if (!state.devices.some(device => device.id === deviceId)) {
+    const added = await api.request(`/api/v1/devices/${encodeURIComponent(deviceId)}`);
+    if (added?.id !== deviceId || typeof added.name !== 'string') throw new ApiError(502, 'protocol');
+    state.devices.unshift(added);
+  }
+  await selectDevice(deviceId);
+}
+
+async function enrollmentAction(action) {
+  if (state.busy) return;
+  await run(async () => {
+    try { await action(); }
+    catch (error) {
+      if (error instanceof ApiError && error.status === 401) throw error;
+      if (!$('#enrollment-dialog').open) {
+        message('Устройство создано, но загрузить его настройки не удалось. Обновите список устройств.');
+        return;
+      }
+      $('#enrollment-result').textContent = error.status === 429
+        ? 'Достигнут лимит. Для кодов подождите до 5 минут, для превью — минуту.'
+        : error.status === 403 ? 'Действие не подтверждено. Закройте мастер и обновите страницу.'
+          : error.status === 422 ? 'Проверьте имя устройства (1–80 символов).'
+            : error.status === 404 ? 'Код недоступен. Закройте мастер и начните заново.'
+              : 'Результат запроса не подтверждён. Повторите действие. Повтор создания превью не создаст дубликат; потерянный код истечёт через 5 минут.';
+    }
+  });
+  renderEnrollment();
+}
 
 function draft() {
   return { brightness: $('#brightness').value, theme: $('#theme').value, start_screen: $('#start-screen').value };
@@ -50,10 +124,12 @@ function setBusy(busy) {
   $('#weather-city').disabled = busy;
   $('#weather-form button').disabled = busy;
   for (const button of document.querySelectorAll('#telegram-code, #telegram-cancel, #telegram-unlink, #telegram-refresh')) button.disabled = busy;
-  for (const button of document.querySelectorAll('#logout, #refresh, #load-more, #retry, .device-button')) button.disabled = busy;
+  for (const button of document.querySelectorAll('#logout, #refresh, #load-more, #retry, #add-device, .device-button')) button.disabled = busy;
+  renderEnrollment();
 }
 
 function loginView(text = '') {
+  clearEnrollment();
   clearTelegramCode();
   state.session = null;
   state.devices = [];
@@ -118,7 +194,7 @@ function renderList() {
     const name = document.createElement('strong');
     name.textContent = device.name;
     const id = document.createElement('small');
-    id.textContent = device.id;
+    id.textContent = device.is_preview ? `Локальное превью · ${device.id}` : device.id;
     button.append(name, id);
     button.addEventListener('click', () => { if (canLeaveSettings()) run(() => selectDevice(device.id)); });
     $('#device-list').append(button);
@@ -170,8 +246,9 @@ async function selectDevice(id) {
 
 async function loadDevices(append = false) {
   const previousSelection = state.selected;
-  const rows = await api.devices(append ? state.devices.length : 0);
-  state.devices = append ? [...state.devices, ...rows] : rows;
+  const rows = await api.devices(append ? state.loaded : 0);
+  state.loaded = (append ? state.loaded : 0) + rows.length;
+  state.devices = append ? [...new Map([...state.devices, ...rows].map(device => [device.id, device])).values()] : rows;
   state.more = rows.length === 50;
   renderList();
   if (!append) {
@@ -185,6 +262,7 @@ async function loadDevices(append = false) {
 }
 
 async function dashboard(session) {
+  clearEnrollment();
   state.session = session;
   state.devices = [];
   state.settings = null;
@@ -216,6 +294,75 @@ async function bootstrap() {
 }
 
 $('#retry').addEventListener('click', () => run(bootstrap));
+$('#add-device').addEventListener('click', () => {
+  if (state.busy || !state.session || !canLeaveSettings()) return;
+  renderEnrollment();
+  $('#enrollment-dialog').showModal();
+  $('#enrollment-name').focus();
+});
+$('#enrollment-mode').addEventListener('change', () => {
+  const preview = $('#enrollment-mode').value === 'preview';
+  $('#enrollment-submit').textContent = preview ? 'Создать превью' : 'Получить одноразовый код';
+  $('#enrollment-help').textContent = preview
+    ? 'Создаст запись в вашем аккаунте для Storm Simulator. Превью использует сессию браузера и не отправляет heartbeat устройства.'
+    : 'Для тестового программного клиента. Настройка Wi-Fi и показ кода на физическом SmallTV пока недоступны.';
+});
+$('#enrollment-form').addEventListener('submit', event => {
+  event.preventDefault();
+  const name = $('#enrollment-name').value.trim();
+  if (!name || !state.session || enrollment.code) return;
+  enrollmentAction(async () => {
+    $('#enrollment-result').textContent = '';
+    if ($('#enrollment-mode').value === 'preview') {
+      const device = await enrollment.createPreview(name, state.session.csrf_token);
+      if (!device) return;
+      // Keep successful creation separate from the potentially failing list refresh.
+      clearEnrollment();
+      await showAddedDevice(device.id);
+      message('Локальное превью создано. Откройте его по кнопке «Открыть превью устройства». Физическое устройство не подключалось.');
+    } else {
+      await enrollment.issue(name, state.session.csrf_token);
+      renderEnrollment();
+      clearInterval(enrollmentTimer);
+      enrollmentTimer = setInterval(renderEnrollment, 1000);
+    }
+  });
+});
+$('#enrollment-check').addEventListener('click', () => enrollmentAction(async () => {
+  const result = await enrollment.check();
+  if (!result) return;
+  if (result.state === 'enrolled') {
+    clearEnrollment();
+    await showAddedDevice(result.device_id);
+    message('Программный клиент зарегистрирован. Это не проверка совместимости физического SmallTV.');
+  } else {
+    $('#enrollment-result').textContent = result.state === 'pending' ? 'Клиент ещё не использовал код.'
+      : result.state === 'expired' ? 'Срок действия истёк. Закройте мастер и получите новый код.'
+        : 'Код больше не активен. Для старых кодов результат регистрации ищите в списке устройств.';
+  }
+}));
+function closeEnrollment() {
+  enrollmentAction(async () => {
+    if (enrollment.code) {
+      const cancelling = enrollment.cancel(state.session.csrf_token);
+      renderEnrollment();
+      await cancelling;
+    }
+    clearInterval(enrollmentTimer);
+    $('#enrollment-secret').textContent = '';
+    $('#enrollment-dialog').close();
+    // Preserve an ambiguous preview request for retry when reopening the wizard.
+    if (!enrollment.preview) clearEnrollment();
+  });
+}
+$('#enrollment-close').addEventListener('click', closeEnrollment);
+$('#enrollment-abandon').addEventListener('click', () => {
+  if (!state.busy) {
+    clearEnrollment();
+    message('Код скрыт, но его отмена не запрашивалась. Он истечёт не позднее чем через 5 минут после выдачи.');
+  }
+});
+$('#enrollment-dialog').addEventListener('cancel', event => { event.preventDefault(); if (!state.busy) closeEnrollment(); });
 $('#telegram-refresh').addEventListener('click', () => run(loadTelegramStatus));
 $('#telegram-code').addEventListener('click', () => run(async () => {
   clearTelegramCode();
@@ -293,7 +440,7 @@ $('#settings-form').addEventListener('submit', event => {
 
 // Check expiry while the page is active; never silently replay a mutation.
 setInterval(() => {
-  if (!state.session || state.busy || document.hidden || document.activeElement?.closest('form')) return;
+  if (!state.session || state.busy || document.hidden || $('#enrollment-dialog').open || document.activeElement?.closest('form')) return;
   run(async () => {
     const session = await api.session();
     if (session.user.id !== state.session.user.id || session.user.role !== state.session.user.role) await dashboard(session);

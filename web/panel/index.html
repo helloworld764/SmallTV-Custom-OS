@@ -63,11 +63,11 @@
         <p id="weather-result" class="save-result" role="status"></p>
         <p class="hint">&#x41F;&#x43E;&#x433;&#x43E;&#x434;&#x430; &#x43F;&#x440;&#x435;&#x434;&#x43E;&#x441;&#x442;&#x430;&#x432;&#x43B;&#x44F;&#x435;&#x442;&#x441;&#x44F; Open-Meteo &#x441; &#x434;&#x430;&#x43D;&#x43D;&#x44B;&#x43C;&#x438; GeoNames. &#x414;&#x43E;&#x441;&#x442;&#x443;&#x43F;&#x43D;&#x43E;&#x441;&#x442;&#x44C; &#x437;&#x430;&#x432;&#x438;&#x441;&#x438;&#x442; &#x43E;&#x442; &#x432;&#x43D;&#x435;&#x448;&#x43D;&#x435;&#x433;&#x43E; &#x441;&#x435;&#x440;&#x432;&#x438;&#x441;&#x430;.</p>
       </section>
-      <div class="section-heading"><p class="muted" id="device-count"></p><button id="refresh" class="text-button" type="button">Обновить список</button></div>
+      <div class="section-heading"><p class="muted" id="device-count"></p><div><button id="add-device" class="primary" type="button">Добавить устройство</button> <button id="refresh" class="text-button" type="button">Обновить список</button></div></div>
       <section id="empty" class="card empty-state" hidden>
         <div class="empty-icon" aria-hidden="true">□</div><h2>Устройств пока нет</h2>
         <p>Здесь появятся устройства, привязанные к вашему аккаунту.</p>
-        <p class="muted">SmallTV ещё в пути? Можно познакомиться со Storm Simulator.</p>
+        <p class="muted">SmallTV ещё в пути? Нажмите «Добавить устройство» и создайте локальное превью с собственными настройками.</p>
         <a class="button secondary" href="/simulator/" target="_blank" rel="noopener">Открыть Storm Simulator ↗</a>
       </section>
       <div id="device-workspace" class="workspace" hidden>
@@ -94,6 +94,30 @@
         </section>
       </div>
     </section>
+    <dialog id="enrollment-dialog" class="card enrollment-dialog" aria-labelledby="enrollment-title">
+      <h2 id="enrollment-title">Добавить устройство</h2>
+      <p class="hint">Локальное превью доступно сейчас. Прошивка и подключение физического SmallTV по Wi-Fi ещё не готовы.</p>
+      <form id="enrollment-form">
+        <fieldset id="enrollment-fields">
+          <label for="enrollment-mode">Способ добавления</label>
+          <select id="enrollment-mode"><option value="preview">Локальное превью — без SmallTV</option><option value="code">Код для программного клиента</option></select>
+          <label for="enrollment-name">Имя устройства</label>
+          <input id="enrollment-name" maxlength="80" required autocomplete="off" placeholder="Например, Мой Storm">
+          <p id="enrollment-help" class="hint">Создаст запись в вашем аккаунте для Storm Simulator. Превью использует сессию браузера и не отправляет heartbeat устройства.</p>
+          <button id="enrollment-submit" class="primary" type="submit">Создать превью</button>
+        </fieldset>
+      </form>
+      <div id="enrollment-code-area" hidden>
+        <p class="hint">Передайте код только своему программному клиенту для POST /api/v1/devices/enroll. Это не код привязки Telegram. Код разрешает зарегистрировать устройство на ваш аккаунт.</p>
+        <code id="enrollment-secret"></code>
+        <p id="enrollment-time" class="hint" role="status"></p>
+        <button id="enrollment-check" class="secondary" type="button">Проверить подключение</button>
+      </div>
+      <p id="enrollment-result" role="status" aria-live="polite"></p>
+      <p class="hint">Закрытие вкладки не отменяет выданный код: он действует не более 5 минут. Для немедленной отмены используйте кнопку ниже.</p>
+      <button id="enrollment-close" class="text-button" type="button">Закрыть</button>
+      <button id="enrollment-abandon" class="text-button" type="button" hidden>Закрыть без отмены — код истечёт сам</button>
+    </dialog>
     <noscript><p class="message">Для работы панели необходимо разрешить JavaScript в браузере.</p></noscript>
   </main>
   <footer class="page-footer"><span>Storm OS</span><span id="connection">Доступность сервера ещё не проверена</span></footer>

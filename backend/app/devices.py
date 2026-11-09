@@ -18,6 +18,7 @@ class DeviceView(BaseModel):
     owner_id: str
     name: str
     created_at: str
+    is_preview: bool = False
 
 
 class SettingsView(BaseModel):
@@ -52,7 +53,8 @@ def devices(
 ):
     with request.app.state.database.connection() as connection:
         return [dict(row) for row in connection.execute("""
-            SELECT id, owner_id, name, created_at FROM devices
+            SELECT id, owner_id, name, created_at,
+                EXISTS(SELECT 1 FROM device_previews WHERE device_id = devices.id) AS is_preview FROM devices
             WHERE owner_id = ? OR ? = 'super_admin' ORDER BY id LIMIT ? OFFSET ?
         """, (*scope(principal), limit, offset)).fetchall()]
 
@@ -61,7 +63,8 @@ def devices(
 def device(device_id: str, request: Request, principal: Annotated[Principal, Depends(current_user)]):
     with request.app.state.database.connection() as connection:
         row = connection.execute("""
-            SELECT id, owner_id, name, created_at FROM devices
+            SELECT id, owner_id, name, created_at,
+                EXISTS(SELECT 1 FROM device_previews WHERE device_id = devices.id) AS is_preview FROM devices
             WHERE id = ? AND (owner_id = ? OR ? = 'super_admin')
         """, (device_id, *scope(principal))).fetchone()
     if row is None:
