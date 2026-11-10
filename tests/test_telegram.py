@@ -678,7 +678,47 @@ def test_sleep_and_need_events_have_independent_durable_queue_identifiers(env):
 
 
 def device_options(env,card,label,now):
+    labels=lambda reply:{button['text'] for row in json.loads(reply['markup'])['inline_keyboard'] for button in row}
+    if label not in labels(card):
+        group={'Тема':'Оформление','Яркость':'Экран','Стартовый экран':'Экран',
+               'Формат часов':'Часы','Секунды':'Часы','Стиль часов':'Часы'}[label]
+        if group not in labels(card): card=apply(env,'/device',now=now)[1]
+        card=apply(env,pet_button(card,group),callback=True,now=now)[1]
     return apply(env,pet_button(card,label),callback=True,now=now)[1]
+
+
+def test_device_settings_are_grouped_and_back_returns_to_clock_section(env):
+    link(env); now=int(time.time())
+    _,root=apply(env,'device:own-tv',callback=True,now=now)
+    labels=lambda reply:[button['text'] for row in json.loads(reply['markup'])['inline_keyboard'] for button in row]
+    assert labels(root)==['Часы','Экран','Оформление','Обновить','Список устройств']
+    _,clock=apply(env,pet_button(root,'Часы'),callback=True,now=now)
+    assert labels(clock)==['Формат часов','Секунды','Стиль часов','Обновить','Назад']
+    choices=device_options(env,clock,'Стиль часов',now)
+    _,back=apply(env,pet_button(choices,'Назад'),callback=True,now=now)
+    assert labels(back)==labels(clock)
+    choices=device_options(env,back,'Стиль часов',now)
+    _,saved=apply(env,pet_button(choices,'Терминал'),callback=True,now=now)
+    assert 'Терминал' in saved['text'] and labels(saved)==labels(clock)
+    _,root=apply(env,pet_button(saved,'Назад'),callback=True,now=now)
+    _,screen=apply(env,pet_button(root,'Экран'),callback=True,now=now)
+    assert labels(screen)==['Яркость','Стартовый экран','Обновить','Назад']
+    levels=device_options(env,screen,'Яркость',now)
+    _,custom=apply(env,pet_button(levels,'Своя яркость'),callback=True,now=now)
+    _,cancelled=apply(env,pet_button(custom,'Отмена'),callback=True,now=now)
+    assert labels(cancelled)==labels(screen)
+
+
+def test_group_navigation_still_checks_owner_and_expiry(env):
+    link(env); now=int(time.time())
+    _,root=apply(env,'device:own-tv',callback=True,now=now)
+    button=pet_button(root,'Часы')
+    with env['db'].transaction() as c:
+        c.execute("INSERT INTO telegram_links(telegram_id,user_id,selected_device_id,linked_at) VALUES (202,?,'other-tv',?)",(env['other'],now))
+    _,denied=apply(env,button,who=202,callback=True,now=now)
+    assert 'own-tv' not in denied['text']
+    _,expired=apply(env,button,callback=True,now=now+301)
+    assert 'устарела' in expired['text']
 
 
 @pytest.mark.parametrize('label,option,field,value,newer', [

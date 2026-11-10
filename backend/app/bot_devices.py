@@ -15,6 +15,10 @@ TOP_LEVEL=('Мои устройства','Питомец','Настройки','
 CLOCK_FORMATS={'24h':'24 часа','12h':'12 часов (AM/PM)'}
 CLOCK_STYLES={'classic':'Классический','minimal':'Минимализм','terminal':'Терминал'}
 CLOCK_SECONDS={'1':'Показывать секунды','0':'Без секунд'}
+GROUPS={'clock':('Часы',(('Формат часов','clock_format'),('Секунды','clock_seconds'),('Стиль часов','clock_style'))),
+        'screen':('Экран',(('Яркость','brightness'),('Стартовый экран','start_screen'))),
+        'appearance':('Оформление',(('Тема','theme'),))}
+FIELD_GROUP={field:group for group,(_,fields) in GROUPS.items() for _,field in fields}
 
 
 def buttons(rows):
@@ -45,20 +49,28 @@ def intent(connection,uid,device_id,field,value,now,expected=None):
     return ('dnav:' if field=='menu' else 'dset:')+key
 
 
-def card(connection,link,now,prefix=''):
+def card(connection,link,now,prefix='',section=None):
     device=owned(connection,link['user_id'],link['selected_device_id'])
     if not device:
         return 'Выберите своё устройство в списке.',buttons([[('Мои устройства','devices')]])
     uid,did=link['user_id'],device['device_id']
-    text=(f'Устройство: {device["name"]}\nТема: {device["theme"]}\nЯркость: {device["brightness"]}%\n'
-          f'Стартовый экран: {SCREENS.get(device["start_screen"],device["start_screen"])}\n\n'
-          f'Часы: {CLOCK_FORMATS[device["clock_format"]]}, {"с секундами" if device["clock_seconds"] else "без секунд"}\n'
-          f'Стиль часов: {CLOCK_STYLES[device["clock_style"]]}\n\n'
-          'Это настройки на сервере. Симулятор показывает их в превью. Применение на физическом SmallTV пока не подтверждается.')
-    rows=[[(label,intent(connection,uid,did,'menu',field,now))] for label,field in
-          [('Тема','theme'),('Яркость','brightness'),('Стартовый экран','start_screen'),
-           ('Формат часов','clock_format'),('Секунды','clock_seconds'),('Стиль часов','clock_style')]]
-    rows += [[('Обновить','device-settings'),('Список устройств','devices')]]
+    text=f'Устройство: {device["name"]}\n'
+    if section=='clock':
+        text+=(f'Часы: {CLOCK_FORMATS[device["clock_format"]]}, {"с секундами" if device["clock_seconds"] else "без секунд"}\n'
+               f'Стиль часов: {CLOCK_STYLES[device["clock_style"]]}')
+    elif section=='screen':
+        text+=f'Яркость: {device["brightness"]}%\nСтартовый экран: {SCREENS.get(device["start_screen"],device["start_screen"])}'
+    elif section=='appearance': text+=f'Тема: {device["theme"]}'
+    else:
+        section=None
+        text+='Выберите раздел настроек.'
+    text+='\n\nНастройки сохраняются на сервере и видны в превью. Применение на физическом SmallTV пока не подтверждается.'
+    if section:
+        rows=[[(label,intent(connection,uid,did,'menu',field,now))] for label,field in GROUPS[section][1]]
+        rows += [[('Обновить',intent(connection,uid,did,'menu','section:'+section,now)),('Назад','device-settings')]]
+    else:
+        rows=[[(title,intent(connection,uid,did,'menu','section:'+group,now))] for group,(title,_) in GROUPS.items()]
+        rows += [[('Обновить','device-settings'),('Список устройств','devices')]]
     return (prefix+'\n\n' if prefix else '')+text,buttons(rows)
 
 
@@ -92,9 +104,12 @@ def handle(connection,link,text,now,callback=False):
         if text.startswith('dnav:'):
             if record['field']!='menu': return card(connection,link,now,'Кнопка недоступна.')
             field=record['value']
+            if field.startswith('section:'):
+                section=field.split(':',1)[1]
+                return card(connection,link,now,section=section)
             if field=='brightness-custom':
                 connection.execute('INSERT INTO telegram_device_drafts VALUES (?,?,?,?,?)',(who,uid,did,now+300,owned(connection,uid,did)['brightness']))
-                return 'Введите яркость целым числом от 0 до 100. На ввод есть 5 минут. 0 скрывает содержимое экрана, индикатор связи сохраняется.',buttons([[('Отмена','device-settings')]])
+                return 'Введите яркость целым числом от 0 до 100. На ввод есть 5 минут. 0 скрывает содержимое экрана, индикатор связи сохраняется.',buttons([[('Отмена',intent(connection,uid,did,'menu','section:screen',now))]])
             device=owned(connection,uid,did)
             options={'theme':THEMES,'start_screen':SCREENS,'clock_format':CLOCK_FORMATS,
                      'clock_seconds':CLOCK_SECONDS,'clock_style':CLOCK_STYLES,
@@ -103,12 +118,16 @@ def handle(connection,link,text,now,callback=False):
             rows=[[(('✓ ' if str(device[field])==str(value) else '')+label,intent(connection,uid,did,field,value,now,str(device[field])))]
                   for value,label in options.items()]
             if field=='brightness': rows += [[('Своя яркость',intent(connection,uid,did,'menu','brightness-custom',now))]]
-            rows += [[('Назад','device-settings')]]
-            return f'Устройство: {device["name"]}. Выберите значение. Экраны с отметкой «заглушка» ещё не реализованы.',buttons(rows)
+            section=FIELD_GROUP.get(field)
+            rows += [[('Назад',intent(connection,uid,did,'menu','section:'+section,now) if section else 'device-settings')]]
+            text=f'Устройство: {device["name"]}. Выберите значение.'
+            if field=='start_screen': text+=' Экраны с отметкой «заглушка» ещё не реализованы.'
+            return text,buttons(rows)
         if record['field']=='menu': return card(connection,link,now,'Кнопка недоступна.')
-        if record['consumed']: return card(connection,link,now,'Эта настройка уже была сохранена. Показываю текущие значения.')
+        section=FIELD_GROUP.get(record['field'])
+        if record['consumed']: return card(connection,link,now,'Эта настройка уже была сохранена. Показываю текущие значения.',section=section)
         if str(owned(connection,uid,did)[record['field']])!=record['expected_value']:
-            return card(connection,link,now,'Эта настройка уже изменилась. Выберите значение из свежей карточки.')
+            return card(connection,link,now,'Эта настройка уже изменилась. Выберите значение из свежей карточки.',section=section)
         try:
             value=int(record['value']) if record['field']=='brightness' else record['value']
             if record['field']=='clock_seconds':
@@ -119,17 +138,17 @@ def handle(connection,link,text,now,callback=False):
         except (ValueError,ValidationError,HTTPException):
             return card(connection,link,now,'Настройка недоступна. Обновите карточку.')
         connection.execute('UPDATE telegram_device_intents SET consumed=1 WHERE id=?',(record['id'],))
-        return card(connection,link,now,'Настройка сохранена на сервере.')
+        return card(connection,link,now,'Настройка сохранена на сервере.',section=section)
     if draft and not callback:
         if draft['expires_at']<=now or draft['device_id']!=link['selected_device_id'] or not owned(connection,uid,draft['device_id']):
             connection.execute('DELETE FROM telegram_device_drafts WHERE telegram_id=?',(who,))
             return card(connection,link,now,'Ввод устарел или устройство сменилось. Откройте яркость заново.')
         if not re.fullmatch(r'0|[1-9][0-9]?|100',text):
-            return 'Нужно целое число от 0 до 100. Например: 42.',buttons([[('Отмена','device-settings')]])
+            return 'Нужно целое число от 0 до 100. Например: 42.',buttons([[('Отмена',intent(connection,uid,draft['device_id'],'menu','section:screen',now))]])
         if owned(connection,uid,draft['device_id'])['brightness']!=draft['expected_brightness']:
             connection.execute('DELETE FROM telegram_device_drafts WHERE telegram_id=?',(who,))
             return card(connection,link,now,'Яркость уже изменилась. Откройте ввод заново, чтобы не потерять новую настройку.')
         save_settings(connection,draft['device_id'],SettingsPatch(brightness=int(text)),uid)
         connection.execute('DELETE FROM telegram_device_drafts WHERE telegram_id=?',(who,))
-        return card(connection,link,now,'Яркость сохранена на сервере.')
+        return card(connection,link,now,'Яркость сохранена на сервере.',section='screen')
     return card(connection,link,now)

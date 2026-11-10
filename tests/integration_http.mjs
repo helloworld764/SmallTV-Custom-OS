@@ -9,6 +9,7 @@ import { Notifications, readNotifications } from '../web/simulator/notifications
 import { EnrollmentFlow } from '../web/panel/enrollment.mjs';
 import { DevicePresence, presenceText } from '../web/panel/device-presence.mjs';
 import { formatClock } from '../web/shared/clock.mjs';
+import { renderClock } from '../web/simulator/clock-render.mjs';
 
 const { base, password } = JSON.parse(readFileSync(0, 'utf8'));
 const cookies = new Map();
@@ -47,6 +48,13 @@ assert.equal(localSettings.settings.start_screen, 'tamagotchi');
 await client.save(localPreview.id, { start_screen: 'clock', clock_format: '12h', clock_seconds: false, clock_style: 'terminal' }, session.csrf_token);
 localSettings.apply(await client.settings(localPreview.id), Date.now());
 assert.equal(localSettings.settings.clock_style, 'terminal');
+const clockNodes = { '.display': { dataset: {} }, '#clock': {}, '#clock-period': {} };
+renderClock({ querySelector: selector => clockNodes[selector] }, localSettings.settings);
+assert.equal(clockNodes['.display'].dataset.clockStyle, 'terminal');
+await client.save(localPreview.id, { clock_style: 'minimal' }, session.csrf_token);
+localSettings.apply(await client.settings(localPreview.id), Date.now());
+renderClock({ querySelector: selector => clockNodes[selector] }, localSettings.settings);
+assert.equal(clockNodes['.display'].dataset.clockStyle, 'minimal');
 assert.deepEqual(formatClock(new Date(2026, 10, 10, 0, 5, 9), localSettings.settings), { time: '12:05', period: 'AM' });
 await client.save(localPreview.id, { brightness: 42 }, session.csrf_token);
 assert.equal((await client.settings(localPreview.id)).clock_seconds, false);

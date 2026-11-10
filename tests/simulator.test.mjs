@@ -4,6 +4,24 @@ import { Connection, checkHealth } from '../web/simulator/connection.mjs';
 import { PreviewSettings } from '../web/simulator/preview.mjs';
 import { Notifications, readNotifications } from '../web/simulator/notifications.mjs';
 import { CLOCK_DEFAULTS, CLOCK_STYLES, formatClock } from '../web/shared/clock.mjs';
+import { renderClock } from '../web/simulator/clock-render.mjs';
+
+test('clock settings immediately update the rendered DOM and restore previous styles cleanly', () => {
+  const nodes = { '.display': { dataset: {} }, '#clock': {}, '#clock-period': {} };
+  const root = { querySelector: selector => nodes[selector] };
+  const now = new Date(2026, 10, 10, 13, 5, 9);
+  for (const style of ['classic', 'minimal', 'terminal', 'classic']) {
+    renderClock(root, { clock_style: style, clock_format: '12h', clock_seconds: false }, now);
+    assert.deepEqual(nodes['.display'].dataset, { clockStyle: style, clockSeconds: 'false' });
+    assert.equal(nodes['#clock'].textContent, '01:05');
+    assert.equal(nodes['#clock-period'].textContent, 'PM');
+    assert.equal(nodes['#clock-period'].hidden, false);
+  }
+  renderClock(root, CLOCK_DEFAULTS, now);
+  assert.equal(nodes['#clock'].textContent, '13:05:09');
+  assert.equal(nodes['#clock-period'].hidden, true);
+  assert.equal(nodes['.display'].dataset.clockSeconds, 'true');
+});
 
 test('clock formats midnight, noon and evening correctly in 12 and 24 hour modes', () => {
   for (const [hour, expected, period] of [[0, '12', 'AM'], [12, '12', 'PM'], [23, '11', 'PM'], [9, '09', 'AM']]) {

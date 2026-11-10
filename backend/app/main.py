@@ -37,6 +37,9 @@ class WebFiles(StaticFiles):
             # Windows MIME mappings may classify modules as text/plain.
             # Browsers require a JavaScript MIME type for ES modules.
             response.headers['content-type'] = 'text/javascript; charset=utf-8'
+        if path in ('', '.') or path.endswith(('.html', '.mjs', '.css')):
+            # Development UI updates must not mix an old renderer/style with new API settings.
+            response.headers['cache-control'] = 'no-store'
         return response
 
 

@@ -1,5 +1,6 @@
 import { Connection, checkHealth } from './connection.mjs';
-import { formatClock } from '../shared/clock.mjs';
+import { CLOCK_STYLES } from '../shared/clock.mjs';
+import { renderClock } from './clock-render.mjs';
 import { ApiClient } from '../panel/api.mjs';
 import { PreviewSettings, THEMES } from './preview.mjs';
 import { Notifications, readNotifications } from './notifications.mjs';
@@ -97,6 +98,7 @@ function drawCurrentPet() {
 
 function renderPreview() {
   const settings = preview.settings;
+  renderClock(document, settings);
   document.querySelector('.display').dataset.theme = preview.theme;
   document.querySelector('.display').dataset.screen = settings.start_screen;
   document.querySelector('#screen-content').style.opacity = preview.canDisplaySettings ? settings.brightness / 100 : 0;
@@ -108,7 +110,7 @@ function renderPreview() {
   const labels = {
     standalone: 'Автономное превью часов. Откройте превью из настроек устройства, чтобы читать их с сервера.',
     loading: 'Читаем сохранённые настройки устройства…',
-    fresh: `Настройки с сервера: ${settings.theme}, яркость ${settings.brightness}%, стартовый экран «${preview.screenTitle}».`,
+    fresh: `Настройки с сервера: ${settings.theme}, яркость ${settings.brightness}%, стартовый экран «${preview.screenTitle}». Часы: ${CLOCK_STYLES[settings.clock_style] || CLOCK_STYLES.classic}, ${settings.clock_format === '12h' ? '12' : '24'} ч, ${settings.clock_seconds === false ? 'без секунд' : 'с секундами'}.`,
     stale: preview.updatedAt === null ? 'Настройки не загружены. Сервер временно недоступен.' : 'Настройки устарели: показана последняя полученная версия.',
     'signed-out': 'Для просмотра настроек войдите в панель управления. Локальные часы и проверка backend продолжают работать.',
     unavailable: 'Устройство или его настройки недоступны этому аккаунту.',
@@ -212,12 +214,7 @@ async function poll() {
 
 function tick() {
   const now = new Date();
-  const clock = formatClock(now, preview.settings);
-  document.querySelector('.display').dataset.clockStyle = preview.settings.clock_style;
-  document.querySelector('.display').dataset.clockSeconds = String(preview.settings.clock_seconds);
-  document.querySelector('#clock').textContent = clock.time;
-  document.querySelector('#clock-period').textContent = clock.period;
-  document.querySelector('#clock-period').hidden = !clock.period;
+  renderClock(document, preview.settings, now);
   document.querySelector('#date').textContent = now.toLocaleDateString('ru-RU', {
     weekday: 'short', day: 'numeric', month: 'long',
   });
