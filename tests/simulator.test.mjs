@@ -31,6 +31,20 @@ test('clock formats midnight, noon and evening correctly in 12 and 24 hour modes
   }
 });
 
+test('clock decoration reports the real local format, date and day progress without fake sync', () => {
+  const properties = {};
+  const nodes = { '.display': { dataset: {} }, '#clock': {}, '#clock-period': {}, '#clock-format-label': {},
+    '#date': {}, '#clock-content': { style: { setProperty: (key, value) => { properties[key] = value; } } } };
+  const root = { querySelector: selector => nodes[selector] };
+  renderClock(root, CLOCK_DEFAULTS, new Date(2026, 10, 10, 12, 0, 0));
+  assert.equal(nodes['#clock-format-label'].textContent, '24H');
+  assert.equal(properties['--day-progress'], '50.00%');
+  assert.match(nodes['#date'].textContent, /10/);
+  renderClock(root, { clock_format: '12h' }, new Date(2026, 10, 10, 0, 0, 0));
+  assert.equal(nodes['#clock-format-label'].textContent, '12H · AM/PM');
+  assert.equal(properties['--day-progress'], '0.00%');
+});
+
 test('all clock styles support seconds on and off without changing the date or time zone', () => {
   const date = new Date(2026, 10, 10, 13, 2, 59);
   for (const clock_style of Object.keys(CLOCK_STYLES)) {

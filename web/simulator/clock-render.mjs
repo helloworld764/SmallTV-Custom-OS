@@ -11,4 +11,10 @@ export function renderClock(root, settings, now = new Date()) {
   const period = root.querySelector('#clock-period');
   period.textContent = clock.period;
   period.hidden = !clock.period;
+  const mode = root.querySelector('#clock-format-label');
+  if (mode) mode.textContent = options.clock_format === '12h' ? '12H · AM/PM' : '24H';
+  const scene = root.querySelector('#clock-content');
+  if (scene) scene.style.setProperty('--day-progress', `${((now.getHours() * 60 + now.getMinutes()) / 1440 * 100).toFixed(2)}%`);
+  const date = root.querySelector('#date');
+  if (date) date.textContent = now.toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'long' });
 }

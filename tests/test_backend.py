@@ -113,12 +113,12 @@ def test_panel_modules_override_windows_plaintext_mime(client, monkeypatch):
 
 
 def test_clock_ui_assets_are_not_cached_and_simulator_entry_is_versioned(client):
-    for path in ['/panel/', '/simulator/', '/simulator/style.css?v=clock-render-2',
-                 '/simulator/simulator.mjs?v=clock-render-2', '/simulator/clock-render.mjs', '/shared/clock.mjs']:
+    for path in ['/panel/', '/simulator/', '/simulator/style.css?v=clock-scenes-3',
+                 '/simulator/simulator.mjs?v=clock-scenes-3', '/simulator/clock-render.mjs', '/shared/clock.mjs']:
         response = client.get(path)
         assert response.status_code == 200 and response.headers['cache-control'] == 'no-store'
     html = client.get('/simulator/').text
-    assert 'style.css?v=clock-render-2' in html and 'simulator.mjs?v=clock-render-2' in html
+    assert 'style.css?v=clock-scenes-3' in html and 'simulator.mjs?v=clock-scenes-3' in html
 
 
 def test_shared_site_theme_assets_and_page_controls_are_public_but_sources_are_private(client, monkeypatch):

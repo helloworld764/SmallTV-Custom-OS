@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Storm Simulator</title>
-  <link rel="stylesheet" href="style.css?v=clock-render-2">
+  <link rel="stylesheet" href="style.css?v=clock-scenes-3">
   <link rel="stylesheet" href="/shared/site-theme.css">
   <script type="module" src="/shared/site-theme.mjs"></script>
 </head>
@@ -18,7 +18,16 @@
       <section class="display" data-theme="red" aria-label="Экран Storm OS 240 на 240 пикселей">
         <header><span class="screen-brand"><img src="storm-logo.png" alt=""><span>Storm OS</span></span> <span id="indicator" data-state="unknown" role="img" aria-label="Доступность неизвестна"></span></header>
         <div id="screen-content">
-          <div id="clock-content"><div id="clock">--:--:--</div><div id="clock-period" hidden></div><div id="date"></div><div id="weather" aria-live="polite"><span id="weather-icon">&#xB7;</span><span id="weather-summary">&#x41F;&#x43E;&#x433;&#x43E;&#x434;&#x430; &#x437;&#x430;&#x433;&#x440;&#x443;&#x436;&#x430;&#x435;&#x442;&#x441;&#x44F;</span></div></div>
+          <div id="clock-content" class="clock-scene">
+            <div class="clock-topline" aria-hidden="true"><span>ЛОКАЛЬНОЕ ВРЕМЯ</span><span id="clock-format-label">24H</span></div>
+            <div class="terminal-chrome" aria-hidden="true"><span class="terminal-dots">● ● ●</span><span>storm@local:~</span><span>TIME</span></div>
+            <div class="terminal-command" aria-hidden="true"><span>$</span> clock --local<span class="terminal-cursor">▌</span></div>
+            <div class="clock-face"><div id="clock">--:--:--</div><div id="clock-period" hidden></div></div>
+            <div class="clock-date-row"><span class="terminal-prompt" aria-hidden="true">date ›</span><div id="date"></div></div>
+            <div id="weather" aria-live="polite"><span id="weather-icon">&#xB7;</span><span id="weather-summary">&#x41F;&#x43E;&#x433;&#x43E;&#x434;&#x430; &#x437;&#x430;&#x433;&#x440;&#x443;&#x436;&#x430;&#x435;&#x442;&#x441;&#x44F;</span></div>
+            <div class="clock-day-track" aria-hidden="true"><span></span></div>
+            <div class="terminal-foot" aria-hidden="true"><span>LOCAL CLOCK</span><span>БРАУЗЕР</span></div>
+          </div>
           <div id="placeholder" hidden><strong id="screen-title"></strong><p>Экран ещё не подключён</p></div>
           <div id="pet-content" hidden>
             <canvas id="pet-art" width="240" height="184" aria-label="Питомец"></canvas>
@@ -43,6 +52,6 @@
          Запустите backend снова: страница восстановит связь автоматически.</p>
     </details>
   </main>
-  <script type="module" src="simulator.mjs?v=clock-render-2"></script>
+  <script type="module" src="simulator.mjs?v=clock-scenes-3"></script>
 </body>
 </html>

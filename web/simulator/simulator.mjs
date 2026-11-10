@@ -215,9 +215,6 @@ async function poll() {
 function tick() {
   const now = new Date();
   renderClock(document, preview.settings, now);
-  document.querySelector('#date').textContent = now.toLocaleDateString('ru-RU', {
-    weekday: 'short', day: 'numeric', month: 'long',
-  });
   connection.age(now.getTime());
   const message = notifications.tick(performance.now());
   notice.textContent = message ?? '';
