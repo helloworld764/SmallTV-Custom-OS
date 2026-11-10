@@ -3,11 +3,35 @@ import assert from 'node:assert/strict';
 import { ApiClient, ApiError, changesFrom, hasDraftChanges } from '../web/panel/api.mjs';
 import { EnrollmentFlow } from '../web/panel/enrollment.mjs';
 import { DevicePresence, presenceText } from '../web/panel/device-presence.mjs';
+import { CLOCK_DEFAULTS } from '../web/shared/clock.mjs';
 
 const csrf = 'a'.repeat(64); // Deliberately synthetic, not a credential.
 const session = { user: { id: 'user-test', display_name: 'Test', role: 'user' }, csrf_token: csrf };
-const settings = { device_id: 'device-test', brightness: 70, theme: 'BlackArch Red', start_screen: 'clock' };
+const settings = { device_id: 'device-test', brightness: 70, theme: 'BlackArch Red', start_screen: 'clock', ...CLOCK_DEFAULTS };
 const reply = (value, status = 200) => ({ ok: status < 400, status, json: async () => value });
+
+test('clock draft detects disabled seconds and sends only changed clock settings', async () => {
+  const draft = { ...settings, clock_format: '12h', clock_seconds: false, clock_style: 'terminal' };
+  assert.equal(hasDraftChanges(settings, draft), true);
+  const changes = changesFrom(settings, draft);
+  assert.deepEqual(changes, { clock_format: '12h', clock_seconds: false, clock_style: 'terminal' });
+  const api = new ApiClient({ fetcher: async (path, options) => {
+    assert.deepEqual(JSON.parse(options.body), changes);
+    assert.equal(options.headers['X-CSRF-Token'], csrf);
+    return reply(draft);
+  } });
+  const saved = await api.save('device-test', changes, csrf);
+  assert.equal(hasDraftChanges(saved, saved), false);
+});
+
+test('invalid server clock options cannot enter the panel while legacy settings get defaults', async () => {
+  for (const patch of [{ clock_seconds: 0 }, { clock_seconds: null }, { clock_format: 'bad' }, { clock_style: 'bad' }]) {
+    const api = new ApiClient({ fetcher: async () => reply({ ...settings, ...patch }) });
+    await assert.rejects(api.settings('device-test'), error => error.kind === 'protocol');
+  }
+  const api = new ApiClient({ fetcher: async () => reply({ device_id: 'device-test', brightness: 70, theme: 'BlackArch Red', start_screen: 'clock' }) });
+  assert.deepEqual(await api.settings('device-test'), settings);
+});
 
 test('device rename uses CSRF and JSON while presence reads never send a heartbeat', async () => {
   const calls = [];

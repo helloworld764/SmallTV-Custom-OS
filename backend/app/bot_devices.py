@@ -12,6 +12,9 @@ THEMES={'BlackArch Red':'Красно-чёрная','Dark Blue':'Синяя','Pu
 SCREENS={'clock':'Часы','tamagotchi':'Tamagotchi','weather':'Погода — заглушка','monitor':'Debian Monitor — заглушка',
          'codex':'Codex — заглушка','null':'Null — заглушка'}
 TOP_LEVEL=('Мои устройства','Питомец','Настройки','Помощь')
+CLOCK_FORMATS={'24h':'24 часа','12h':'12 часов (AM/PM)'}
+CLOCK_STYLES={'classic':'Классический','minimal':'Минимализм','terminal':'Терминал'}
+CLOCK_SECONDS={'1':'Показывать секунды','0':'Без секунд'}
 
 
 def buttons(rows):
@@ -49,9 +52,12 @@ def card(connection,link,now,prefix=''):
     uid,did=link['user_id'],device['device_id']
     text=(f'Устройство: {device["name"]}\nТема: {device["theme"]}\nЯркость: {device["brightness"]}%\n'
           f'Стартовый экран: {SCREENS.get(device["start_screen"],device["start_screen"])}\n\n'
+          f'Часы: {CLOCK_FORMATS[device["clock_format"]]}, {"с секундами" if device["clock_seconds"] else "без секунд"}\n'
+          f'Стиль часов: {CLOCK_STYLES[device["clock_style"]]}\n\n'
           'Это настройки на сервере. Симулятор показывает их в превью. Применение на физическом SmallTV пока не подтверждается.')
     rows=[[(label,intent(connection,uid,did,'menu',field,now))] for label,field in
-          [('Тема','theme'),('Яркость','brightness'),('Стартовый экран','start_screen')]]
+          [('Тема','theme'),('Яркость','brightness'),('Стартовый экран','start_screen'),
+           ('Формат часов','clock_format'),('Секунды','clock_seconds'),('Стиль часов','clock_style')]]
     rows += [[('Обновить','device-settings'),('Список устройств','devices')]]
     return (prefix+'\n\n' if prefix else '')+text,buttons(rows)
 
@@ -90,7 +96,9 @@ def handle(connection,link,text,now,callback=False):
                 connection.execute('INSERT INTO telegram_device_drafts VALUES (?,?,?,?,?)',(who,uid,did,now+300,owned(connection,uid,did)['brightness']))
                 return 'Введите яркость целым числом от 0 до 100. На ввод есть 5 минут. 0 скрывает содержимое экрана, индикатор связи сохраняется.',buttons([[('Отмена','device-settings')]])
             device=owned(connection,uid,did)
-            options=THEMES if field=='theme' else SCREENS if field=='start_screen' else {str(v):f'{v}%' for v in (0,10,25,50,75,100)} if field=='brightness' else None
+            options={'theme':THEMES,'start_screen':SCREENS,'clock_format':CLOCK_FORMATS,
+                     'clock_seconds':CLOCK_SECONDS,'clock_style':CLOCK_STYLES,
+                     'brightness':{str(v):f'{v}%' for v in (0,10,25,50,75,100)}}.get(field)
             if options is None: return card(connection,link,now,'Настройка недоступна.')
             rows=[[(('✓ ' if str(device[field])==str(value) else '')+label,intent(connection,uid,did,field,value,now,str(device[field])))]
                   for value,label in options.items()]
@@ -103,6 +111,9 @@ def handle(connection,link,text,now,callback=False):
             return card(connection,link,now,'Эта настройка уже изменилась. Выберите значение из свежей карточки.')
         try:
             value=int(record['value']) if record['field']=='brightness' else record['value']
+            if record['field']=='clock_seconds':
+                if value not in ('0','1'): raise ValueError('Invalid seconds option')
+                value=value=='1'
             payload=SettingsPatch(**{record['field']:value})
             save_settings(connection,did,payload,uid)
         except (ValueError,ValidationError,HTTPException):

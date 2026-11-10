@@ -287,7 +287,39 @@ def test_settings_update_persists_after_app_restart_with_session(env):
         response = restarted.get('/api/v1/devices/alice-tv/settings')
         assert response.status_code == 200
         assert response.json() == {'device_id': 'alice-tv', 'brightness': 0,
-                                   'theme': 'Purple', 'start_screen': 'weather'}
+                                   'theme': 'Purple', 'start_screen': 'weather',
+                                   'clock_format': '24h', 'clock_seconds': True, 'clock_style': 'classic'}
+
+
+def test_clock_settings_defaults_partial_updates_and_restart(env):
+    client, app, _, _ = env
+    headers = csrf(env)
+    path = '/api/v1/devices/alice-tv/settings'
+    before = client.get(path).json()
+    assert (before['clock_format'], before['clock_seconds'], before['clock_style']) == ('24h', True, 'classic')
+    patch = {'clock_format': '12h', 'clock_seconds': False, 'clock_style': 'terminal'}
+    saved = client.patch(path, headers=headers, json=patch)
+    assert saved.status_code == 200 and saved.json() == {**before, **patch}
+    assert client.patch(path, headers=headers, json={'brightness': 55}).json() == {**before, **patch, 'brightness': 55}
+    app.state.database.initialize()
+    with app.state.database.connection() as connection:
+        row = connection.execute("SELECT clock_seconds,clock_format,clock_style FROM device_settings WHERE device_id='alice-tv'").fetchone()
+        assert tuple(row) == (0, '12h', 'terminal')
+    assert client.patch('/api/v1/devices/bob-tv/settings', headers=headers, json=patch).status_code == 404
+    assert client.patch(path, json=patch).status_code == 403
+
+
+@pytest.mark.parametrize('patch', [
+    {'clock_format': '12'}, {'clock_format': 24}, {'clock_format': None}, {'clock_style': 'custom-code'},
+    {'clock_seconds': 0}, {'clock_seconds': 'false'}, {'clock_seconds': None}, {'clock_style': None},
+])
+def test_clock_settings_reject_invalid_values_atomically(env, patch):
+    client = env[0]
+    headers = csrf(env)
+    path = '/api/v1/devices/alice-tv/settings'
+    before = client.get(path).json()
+    assert client.patch(path, headers=headers, json={'brightness': 19, **patch}).status_code == 422
+    assert client.get(path).json() == before
 
 
 @pytest.mark.parametrize('body', [

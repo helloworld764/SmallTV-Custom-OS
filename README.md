@@ -24,6 +24,9 @@ FastAPI backend, SQLite, веб-панель управления и симул�
 
 Weather city preferences, API behavior and provider constraints: [docs/weather.md](docs/weather.md).
 
+Формат часов 12/24, секунды и три стиля в панели, боте и симуляторе:
+[docs/clock-appearance.md](docs/clock-appearance.md).
+
 ## Структура
 
 ```text

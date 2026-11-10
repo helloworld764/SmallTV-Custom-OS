@@ -1,5 +1,6 @@
 // Pure preview state. Cached settings survive a network outage, never an access denial.
-export const DEFAULT_SETTINGS = Object.freeze({ brightness: 70, theme: 'BlackArch Red', start_screen: 'clock' });
+import { CLOCK_DEFAULTS, clockSettings } from '../shared/clock.mjs';
+export const DEFAULT_SETTINGS = Object.freeze({ brightness: 70, theme: 'BlackArch Red', start_screen: 'clock', ...CLOCK_DEFAULTS });
 export const THEMES = Object.freeze({
   'BlackArch Red': 'red', 'Dark Blue': 'blue', Purple: 'purple', Light: 'light',
 });
@@ -17,7 +18,7 @@ export class PreviewSettings {
 
   apply(settings, now) {
     if (settings.device_id !== this.deviceId) throw new Error('Unexpected preview device');
-    this.settings = { ...settings };
+    this.settings = { ...settings, ...clockSettings(settings) };
     this.state = 'fresh';
     this.updatedAt = now;
   }

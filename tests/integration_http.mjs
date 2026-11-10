@@ -8,6 +8,7 @@ import { checkHealth } from '../web/simulator/connection.mjs';
 import { Notifications, readNotifications } from '../web/simulator/notifications.mjs';
 import { EnrollmentFlow } from '../web/panel/enrollment.mjs';
 import { DevicePresence, presenceText } from '../web/panel/device-presence.mjs';
+import { formatClock } from '../web/shared/clock.mjs';
 
 const { base, password } = JSON.parse(readFileSync(0, 'utf8'));
 const cookies = new Map();
@@ -43,6 +44,12 @@ await client.save(localPreview.id, { start_screen: 'tamagotchi' }, session.csrf_
 const localSettings = new PreviewSettings(localPreview.id);
 localSettings.apply(await client.settings(localPreview.id), Date.now());
 assert.equal(localSettings.settings.start_screen, 'tamagotchi');
+await client.save(localPreview.id, { start_screen: 'clock', clock_format: '12h', clock_seconds: false, clock_style: 'terminal' }, session.csrf_token);
+localSettings.apply(await client.settings(localPreview.id), Date.now());
+assert.equal(localSettings.settings.clock_style, 'terminal');
+assert.deepEqual(formatClock(new Date(2026, 10, 10, 0, 5, 9), localSettings.settings), { time: '12:05', period: 'AM' });
+await client.save(localPreview.id, { brightness: 42 }, session.csrf_token);
+assert.equal((await client.settings(localPreview.id)).clock_seconds, false);
 wizard.reset();
 const preview = new PreviewSettings('integration-tv');
 preview.apply(await client.settings('integration-tv'), Date.now());

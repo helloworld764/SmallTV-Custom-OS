@@ -1,4 +1,5 @@
 import { Connection, checkHealth } from './connection.mjs';
+import { formatClock } from '../shared/clock.mjs';
 import { ApiClient } from '../panel/api.mjs';
 import { PreviewSettings, THEMES } from './preview.mjs';
 import { Notifications, readNotifications } from './notifications.mjs';
@@ -211,7 +212,12 @@ async function poll() {
 
 function tick() {
   const now = new Date();
-  document.querySelector('#clock').textContent = now.toLocaleTimeString('ru-RU');
+  const clock = formatClock(now, preview.settings);
+  document.querySelector('.display').dataset.clockStyle = preview.settings.clock_style;
+  document.querySelector('.display').dataset.clockSeconds = String(preview.settings.clock_seconds);
+  document.querySelector('#clock').textContent = clock.time;
+  document.querySelector('#clock-period').textContent = clock.period;
+  document.querySelector('#clock-period').hidden = !clock.period;
   document.querySelector('#date').textContent = now.toLocaleDateString('ru-RU', {
     weekday: 'short', day: 'numeric', month: 'long',
   });

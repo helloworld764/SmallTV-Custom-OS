@@ -71,6 +71,8 @@ input:not([type=range]), select { width: 100%; padding: 12px 13px; border-radius
 .help { max-width: 760px; padding: 36px; margin: 40px auto; }.help h1 { font-size: 30px; }.help p { color: #c0c2cb; }.help pre { overflow-x: auto; background: #0b0c10; border-radius: 8px; padding: 18px; font-size: 12px; }
 .enrollment-dialog { color: inherit; width: min(560px, calc(100% - 32px)); max-height: calc(100dvh - 40px); padding: 28px; overflow-y: auto; }
 .enrollment-dialog::backdrop { background: #000a; }
+.checkbox-label { display: flex; align-items: center; gap: 10px; min-height: 44px; }
+.checkbox-label input[type=checkbox] { width: 20px; height: 20px; min-height: 20px; padding: 0; accent-color: var(--accent); }
 .device-presence { border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin: 16px 0; }
 .device-presence p:first-child { margin: 0 0 8px; font-size: 14px; font-weight: 600; }
 #device-presence[data-state=ONLINE] { color: #65c998; }

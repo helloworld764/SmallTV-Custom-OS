@@ -3,6 +3,34 @@ import assert from 'node:assert/strict';
 import { Connection, checkHealth } from '../web/simulator/connection.mjs';
 import { PreviewSettings } from '../web/simulator/preview.mjs';
 import { Notifications, readNotifications } from '../web/simulator/notifications.mjs';
+import { CLOCK_DEFAULTS, CLOCK_STYLES, formatClock } from '../web/shared/clock.mjs';
+
+test('clock formats midnight, noon and evening correctly in 12 and 24 hour modes', () => {
+  for (const [hour, expected, period] of [[0, '12', 'AM'], [12, '12', 'PM'], [23, '11', 'PM'], [9, '09', 'AM']]) {
+    const date = new Date(2026, 10, 10, hour, 5, 7);
+    assert.deepEqual(formatClock(date, { clock_format: '12h' }), { time: `${expected}:05:07`, period });
+    assert.deepEqual(formatClock(date), { time: `${String(hour).padStart(2, '0')}:05:07`, period: '' });
+  }
+});
+
+test('all clock styles support seconds on and off without changing the date or time zone', () => {
+  const date = new Date(2026, 10, 10, 13, 2, 59);
+  for (const clock_style of Object.keys(CLOCK_STYLES)) {
+    assert.equal(formatClock(date, { clock_style, clock_seconds: false }).time, '13:02');
+    assert.equal(formatClock(date, { clock_style, clock_seconds: true }).time, '13:02:59');
+  }
+});
+
+test('clock settings survive a connection outage and clear after denied access', () => {
+  const preview = new PreviewSettings('tv');
+  preview.apply({ device_id: 'tv', ...CLOCK_DEFAULTS, clock_style: 'terminal', clock_seconds: false }, 1000);
+  preview.fail();
+  assert.equal(preview.settings.clock_seconds, false);
+  assert.equal(preview.settings.clock_style, 'terminal');
+  preview.fail(401);
+  assert.equal(preview.settings.clock_seconds, true);
+  assert.equal(preview.settings.clock_style, 'classic');
+});
 
 function notificationPage(events = [{ id: 'event-one', cursor: 1, kind: 'DONE', ttl_seconds: 60 }]) {
   return { device_id: 'device-one', server_time: 1000, next_cursor: events.at(-1)?.cursor ?? 0, events };
@@ -197,7 +225,7 @@ test('network outage keeps cached settings stale and recovery replaces them', ()
   preview.apply(initial, 1000);
   preview.fail(0);
   assert.equal(preview.state, 'stale');
-  assert.deepEqual(preview.settings, initial);
+  assert.deepEqual(preview.settings, { ...initial, ...CLOCK_DEFAULTS });
   preview.apply({ ...initial, brightness: 50 }, 2000);
   assert.equal(preview.state, 'fresh');
   assert.equal(preview.settings.brightness, 50);

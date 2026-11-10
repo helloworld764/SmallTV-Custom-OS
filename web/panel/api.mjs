@@ -1,3 +1,5 @@
+import { clockSettings } from '../shared/clock.mjs';
+
 export class ApiError extends Error {
   constructor(status, kind = 'http') {
     super(`API ${kind} (${status})`);
@@ -141,11 +143,12 @@ function settingsData(value, expectedId) {
       || value.device_id !== expectedId || typeof value.theme !== 'string' || typeof value.start_screen !== 'string') {
     throw new ApiError(502, 'protocol');
   }
-  return value;
+  try { return { ...value, ...clockSettings(value) }; }
+  catch { throw new ApiError(502, 'protocol'); }
 }
 
 export function changesFrom(previous, draft) {
-  return Object.fromEntries(['brightness', 'theme', 'start_screen']
+  return Object.fromEntries(['brightness', 'theme', 'start_screen', 'clock_format', 'clock_seconds', 'clock_style']
     .filter(key => draft[key] !== previous[key]).map(key => [key, draft[key]]));
 }
 

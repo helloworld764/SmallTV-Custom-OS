@@ -681,6 +681,54 @@ def device_options(env,card,label,now):
     return apply(env,pet_button(card,label),callback=True,now=now)[1]
 
 
+@pytest.mark.parametrize('label,option,field,value,newer', [
+    ('Формат часов','12 часов (AM/PM)','clock_format','12h','24h'),
+    ('Секунды','Без секунд','clock_seconds',False,True),
+    ('Стиль часов','Терминал','clock_style','terminal','minimal'),
+])
+def test_bot_clock_options_share_api_and_repeated_buttons_do_not_undo_panel_changes(env,label,option,field,value,newer):
+    link(env); now=int(time.time())
+    _,card=apply(env,'device:own-tv',callback=True,now=now)
+    choices=device_options(env,card,label,now)
+    button=pet_button(choices,option)
+    _,saved=apply(env,button,callback=True,now=now)
+    assert 'сохранена на сервере' in saved['text']
+    result=env['api'].get('/api/v1/devices/own-tv/settings').json()
+    assert result[field]==value and type(result[field]) is type(value)
+    assert result['theme']=='BlackArch Red' and result['brightness']==70
+    assert env['api'].patch('/api/v1/devices/own-tv/settings',headers=env['csrf'],json={field:newer}).status_code==200
+    _,duplicate=apply(env,button,callback=True,now=now)
+    assert 'уже была сохранена' in duplicate['text']
+    assert env['api'].get('/api/v1/devices/own-tv/settings').json()[field]==newer
+    assert env['api'].get('/api/v1/devices/own-tv/presence').json()['state']=='UNKNOWN'
+
+
+def test_unused_clock_button_detects_concurrent_panel_update(env):
+    link(env); now=int(time.time())
+    _,card=apply(env,'device:own-tv',callback=True,now=now)
+    choices=device_options(env,card,'Стиль часов',now)
+    button=pet_button(choices,'Минимализм')
+    env['api'].patch('/api/v1/devices/own-tv/settings',headers=env['csrf'],json={'clock_style':'terminal'})
+    _,stale=apply(env,button,callback=True,now=now)
+    assert 'уже изменилась' in stale['text']
+    assert env['api'].get('/api/v1/devices/own-tv/settings').json()['clock_style']=='terminal'
+
+
+def test_clock_button_checks_ownership_and_expiry(env):
+    link(env); now=int(time.time())
+    _,card=apply(env,'device:own-tv',callback=True,now=now)
+    choices=device_options(env,card,'Секунды',now)
+    button=pet_button(choices,'Без секунд')
+    _,expired=apply(env,button,callback=True,now=now+301)
+    assert 'устарела' in expired['text']
+    _,card=apply(env,'/device',now=now+302)
+    choices=device_options(env,card,'Секунды',now+302)
+    with env['db'].transaction() as c:
+        c.execute("UPDATE devices SET owner_id=? WHERE id='own-tv'",(env['other'],))
+    apply(env,pet_button(choices,'Без секунд'),callback=True,now=now+302)
+    assert env['api'].get('/api/v1/devices/own-tv/settings').json()['clock_seconds'] is True
+
+
 def test_bot_theme_brightness_and_start_screen_share_panel_api_and_do_not_fake_presence(env):
     link(env); now=int(time.time())
     _,card=apply(env,'device:own-tv',callback=True,now=now)

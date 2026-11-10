@@ -21,6 +21,13 @@ header { font-size: 12px; letter-spacing: 2px; color: var(--screen-accent); disp
 .display[data-screen=tamagotchi] #screen-content { width: calc(100% + 32px); height: 208px; margin: 0 0 0 -16px; }
 .display[data-screen=tamagotchi] footer { display: none; }
 #clock { font: 36px ui-monospace, monospace; text-align: center; padding-top: 10px; }
+#clock { font-variant-numeric: tabular-nums; }
+#clock-period { font: 10px system-ui, sans-serif; text-align: center; color: var(--screen-accent); margin-top: 2px; }
+.display[data-clock-seconds=false] #clock { font-size: 48px; }
+.display[data-clock-style=minimal] #clock { font: 300 40px system-ui, sans-serif; font-variant-numeric: tabular-nums; letter-spacing: -1px; }
+.display[data-clock-style=minimal][data-clock-seconds=false] #clock { font-size: 56px; }
+.display[data-clock-style=terminal] #clock { font: 28px ui-monospace, monospace; color: var(--screen-accent); border: 1px solid var(--screen-accent); border-radius: 4px; padding: 6px 2px; margin-top: 10px; letter-spacing: 1px; }
+.display[data-clock-style=terminal][data-clock-seconds=false] #clock { font-size: 40px; }
 #placeholder { text-align: center; padding-top: 12px; }
 #placeholder strong { font-size: 20px; }
 #placeholder p { font-size: 12px; color: var(--screen-text); }
@@ -34,6 +41,7 @@ header { font-size: 12px; letter-spacing: 2px; color: var(--screen-accent); disp
 #date { font-size: 13px; text-align: center; margin-top: 8px; }
 #weather { display: flex; justify-content: center; align-items: center; gap: 5px; margin-top: 8px; color: var(--screen-text); font-size: 10px; line-height: 13px; text-align: center; }
 #weather-icon { font-size: 14px; }
+#weather-summary { min-width: 0; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; max-height: 26px; }
 .weather-credit { font-size: 11px; }
 footer { position: absolute; bottom: 12px; font-size: 9px; letter-spacing: 1px; color: #9999a4; }
 #notice { position: absolute; inset: 54px 8px 44px; background: var(--screen-bg); border: 1px solid var(--screen-accent); padding: 28px 8px; box-sizing: border-box; text-align: center; font-size: 17px; }

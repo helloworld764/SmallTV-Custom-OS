@@ -123,5 +123,6 @@ def test_shared_site_theme_assets_and_page_controls_are_public_but_sources_are_p
     module = client.get('/shared/site-theme.mjs')
     assert module.status_code == 200 and module.headers['content-type'] == 'text/javascript; charset=utf-8'
     assert client.get('/shared/site-theme.css').status_code == 200
+    assert client.get('/shared/clock.mjs').headers['content-type'] == 'text/javascript; charset=utf-8'
     assert client.get('/shared/.env').status_code == 404
     assert client.get('/shared/%2e%2e/%2e%2e/backend/app/config.py').status_code == 404

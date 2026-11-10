@@ -102,6 +102,14 @@
               <select id="theme" name="theme"><option>BlackArch Red</option><option>Dark Blue</option><option>Purple</option><option>Light</option></select>
               <label for="start-screen">Стартовый экран</label>
               <select id="start-screen" name="start_screen"><option value="clock">Часы</option><option value="weather">Погода</option><option value="monitor">Мониторинг</option><option value="codex">Codex</option><option value="null">Null</option><option value="tamagotchi">Tamagotchi</option></select>
+              <div class="form-divider"></div>
+              <h3>Оформление часов</h3>
+              <label for="clock-format">Формат времени</label>
+              <select id="clock-format" name="clock_format"><option value="24h">24 часа</option><option value="12h">12 часов (AM/PM)</option></select>
+              <label class="checkbox-label" for="clock-seconds"><input id="clock-seconds" name="clock_seconds" type="checkbox" checked> Показывать секунды</label>
+              <label for="clock-style">Стиль часов</label>
+              <select id="clock-style" name="clock_style"><option value="classic">Классический</option><option value="minimal">Минимализм</option><option value="terminal">Терминал</option></select>
+              <p class="hint">Комбинируйте стиль, формат и секунды по своему вкусу. Часы используют часовой пояс браузера; погода под датой сохраняется.</p>
               <p class="hint">Настройки сохраняются на сервере и отображаются в превью устройства. Доставка на реальный SmallTV пока не подключена.</p>
               <p id="dirty-note" class="hint" role="status" hidden>Есть несохранённые изменения.</p>
               <div class="save-row"><button class="primary" type="submit">Сохранить настройки</button><button id="discard-settings" class="text-button" type="button">Отменить изменения</button><button id="reload-settings" class="text-button" type="button">Перечитать с сервера</button></div>

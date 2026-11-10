@@ -13,6 +13,37 @@ from backend.app.main import create_app
 MIGRATION_COUNT = len(list(MIGRATIONS.glob('*.sql')))
 
 
+def test_clock_upgrade_preserves_settings_and_existing_bot_buttons(tmp_path):
+    old_sql = tmp_path / 'sql-0015'
+    old_sql.mkdir()
+    for file in sorted(MIGRATIONS.glob('*.sql'))[:15]:
+        (old_sql / file.name).write_bytes(file.read_bytes())
+    database = Database(tmp_path / 'clock-upgrade.sqlite3', old_sql)
+    database.initialize()
+    with database.transaction() as connection:
+        connection.execute("INSERT INTO users(id,display_name) VALUES ('legacy','Legacy')")
+        connection.execute("INSERT INTO devices(id,owner_id,name) VALUES ('legacy-tv','legacy','Existing TV')")
+        connection.execute("INSERT INTO device_settings(device_id,brightness,theme,start_screen) VALUES ('legacy-tv',25,'Purple','tamagotchi')")
+        for consumed in (0, 1):
+            connection.execute('''INSERT INTO telegram_device_intents VALUES (?, 'legacy','legacy-tv','theme','Light','Purple',1000,?)''',
+                               (f'old-button-{consumed}', consumed))
+        buttons = [tuple(row) for row in connection.execute('SELECT * FROM telegram_device_intents ORDER BY rowid')]
+        history = [tuple(row) for row in connection.execute('SELECT * FROM schema_migrations ORDER BY version')]
+    upgraded = Database(database.path)
+    upgraded.initialize()
+    upgraded.initialize()
+    with upgraded.transaction() as connection:
+        row = connection.execute('SELECT * FROM device_settings').fetchone()
+        assert (row['brightness'],row['theme'],row['start_screen']) == (25,'Purple','tamagotchi')
+        assert (row['clock_format'],row['clock_seconds'],row['clock_style']) == ('24h',1,'classic')
+        assert [tuple(row) for row in connection.execute('SELECT * FROM telegram_device_intents ORDER BY rowid')] == buttons
+        assert [tuple(row) for row in connection.execute('SELECT * FROM schema_migrations WHERE version<=15 ORDER BY version')] == history
+        assert connection.execute('PRAGMA foreign_key_check').fetchall() == []
+        connection.execute("INSERT INTO telegram_device_intents VALUES ('new-clock','legacy','legacy-tv','clock_style','minimal','classic',1000,0)")
+        with pytest.raises(sqlite3.IntegrityError):
+            connection.execute("UPDATE device_settings SET clock_style='unknown'")
+
+
 @pytest.fixture
 def database(tmp_path):
     database = Database(tmp_path / 'данные' / 'smalltv.sqlite3')

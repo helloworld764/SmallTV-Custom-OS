@@ -11,6 +11,8 @@ from .auth import Principal, current_user, write_user
 router = APIRouter(prefix="/api/v1/devices", tags=["devices"])
 Theme = Literal["BlackArch Red", "Dark Blue", "Purple", "Light"]
 Screen = Literal["clock", "weather", "monitor", "codex", "null", "tamagotchi"]
+ClockFormat = Literal['12h', '24h']
+ClockStyle = Literal['classic', 'minimal', 'terminal']
 
 
 class DeviceView(BaseModel):
@@ -31,6 +33,9 @@ class SettingsView(BaseModel):
     brightness: int
     theme: str
     start_screen: str
+    clock_format: ClockFormat
+    clock_seconds: bool
+    clock_style: ClockStyle
 
 
 class SettingsPatch(BaseModel):
@@ -38,6 +43,9 @@ class SettingsPatch(BaseModel):
     brightness: int | None = Field(default=None, strict=True, ge=0, le=100)
     theme: Theme | None = None
     start_screen: Screen | None = None
+    clock_format: ClockFormat | None = None
+    clock_seconds: bool | None = Field(default=None, strict=True)
+    clock_style: ClockStyle | None = None
 
     @model_validator(mode="after")
     def require_changes(self):

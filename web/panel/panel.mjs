@@ -99,7 +99,8 @@ async function enrollmentAction(action) {
 }
 
 function draft() {
-  return { brightness: $('#brightness').value, theme: $('#theme').value, start_screen: $('#start-screen').value };
+  return { brightness: $('#brightness').value, theme: $('#theme').value, start_screen: $('#start-screen').value,
+    clock_format: $('#clock-format').value, clock_seconds: $('#clock-seconds').checked, clock_style: $('#clock-style').value };
 }
 
 function settingsDirty() {
@@ -286,6 +287,9 @@ function renderSettings() {
   $('#brightness-range').value = state.settings.brightness;
   selectValue($('#theme'), state.settings.theme);
   selectValue($('#start-screen'), state.settings.start_screen);
+  $('#clock-format').value = state.settings.clock_format;
+  $('#clock-seconds').checked = state.settings.clock_seconds;
+  $('#clock-style').value = state.settings.clock_style;
   $('#settings-form').hidden = false;
   $('#dirty-note').hidden = true;
 }
@@ -530,9 +534,7 @@ $('#settings-form').addEventListener('submit', event => {
   if (!state.settings || !$('#settings-form').reportValidity()) return;
   run(async () => {
     $('#save-result').textContent = '';
-    const changes = changesFrom(state.settings, {
-      brightness: Number($('#brightness').value), theme: $('#theme').value, start_screen: $('#start-screen').value,
-    });
+    const changes = changesFrom(state.settings, { ...draft(), brightness: Number($('#brightness').value) });
     if (!Object.keys(changes).length) { $('#save-result').textContent = 'Изменений нет.'; return; }
     state.settings = await api.save(state.selected, changes, state.session.csrf_token);
     renderSettings();
