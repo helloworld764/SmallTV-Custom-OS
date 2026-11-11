@@ -170,3 +170,15 @@ summary { cursor: pointer; }
 .display[data-device-style=orbit] .wx-hero { border:1px solid var(--screen-accent); border-radius:22px 4px; }
 .display[data-device-style=orbit] #wx-art { border-radius:50%; background:color-mix(in srgb,var(--screen-accent) 10%,transparent); }
 .display[data-device-style=orbit] .wx-metrics > div { border-radius:12px 3px; }
+.display[data-backdrop=gradient] { background-image:linear-gradient(135deg,color-mix(in srgb,var(--screen-accent) 25%,var(--screen-bg)),var(--screen-bg) 70%); }
+.display[data-backdrop=grid] { background-image:linear-gradient(color-mix(in srgb,var(--screen-accent) 12%,transparent) 1px,transparent 1px),linear-gradient(90deg,color-mix(in srgb,var(--screen-accent) 12%,transparent) 1px,transparent 1px); background-size:16px 16px; }
+.display[data-backdrop=stars] { background-image:radial-gradient(circle at 15% 12%,var(--screen-accent) 0 1px,transparent 1.5px),radial-gradient(circle at 70% 40%,var(--screen-text) 0 1px,transparent 1.5px),radial-gradient(circle at 40% 85%,var(--screen-text) 0 .7px,transparent 1px); background-size:83px 97px,111px 131px,67px 79px; }
+.display[data-pet-motion=off] #pet-art { animation:none; }
+.display[data-pet-motion=reduced] #pet-art { animation:pet-quiet 20s ease-in-out infinite; }
+@keyframes pet-quiet { 50% { transform:translateY(-.5px); } }
+#pet-bubble { position:absolute; z-index:2; top:35px; right:8px; max-width:108px; padding:5px 7px; border:1px solid var(--screen-accent); border-radius:10px 10px 2px 10px; background:var(--screen-bg); color:var(--screen-text); font:10px/13px system-ui,sans-serif; }
+.embedded { padding:6px; }
+.embedded main > :not(.case):not(#draft-label) { display:none; }
+.embedded .case { padding:8px; margin:0; border:0; border-radius:8px; }
+.embedded #draft-label { font:10px/14px system-ui,sans-serif; margin:0 0 4px; }
+@media (prefers-reduced-motion: reduce) { .display #pet-art { animation:none !important; } }

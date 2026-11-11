@@ -93,6 +93,10 @@
           </div>
           <a id="device-preview" class="button secondary" target="_blank" rel="noopener" hidden>Открыть превью устройства ↗</a>
           <p id="settings-loading" class="muted" hidden>Загружаем настройки…</p>
+          <section class="web-remote" aria-label="Быстрое управление">
+            <h3>Быстрое управление</h3><p id="web-remote-status" class="hint">Выберите устройство.</p>
+            <div class="remote-buttons"><button type="button" data-control="previous">◀ Назад</button><button type="button" data-control="next">Вперёд ▶</button><button type="button" data-control="screen" data-screen="clock">Часы</button><button type="button" data-control="screen" data-screen="weather">Погода</button><button type="button" data-control="screen" data-screen="tamagotchi">Питомец</button><button type="button" data-control="screen" data-screen="markets">Курсы</button><button type="button" data-control="dimmer">Темнее</button><button type="button" data-control="brighter">Ярче</button><button type="button" data-control="home">Главный экран</button></div>
+          </section>
           <form id="settings-form" hidden>
             <fieldset id="settings-fields">
               <h3>Экран</h3><div class="field-row"><div><label for="brightness">Яркость</label><p class="hint">От 0 до 100%</p></div><div class="number-field"><input id="brightness" name="brightness" type="number" min="0" max="100" step="1" required><span>%</span></div></div>
@@ -110,7 +114,7 @@
               <label class="checkbox-label" for="clock-seconds"><input id="clock-seconds" name="clock_seconds" type="checkbox" checked> Показывать секунды</label>
               <label for="clock-style">Стиль часов</label>
               <select id="clock-style" name="clock_layout"><option value="regular">Обычный</option><option value="tall">Увеличенный</option><option value="stacked">Минуты под часами</option><option value="analog">Со стрелками</option></select>
-              <p class="hint">Комбинируйте стиль, формат и секунды по своему вкусу. Часы используют часовой пояс браузера; погода под датой сохраняется.</p>
+              <p class="hint">Комбинируйте стиль, формат и секунды. Часовой пояс и формат даты доступны в расширенных настройках ниже.</p>
               <p class="hint">Настройки сохраняются на сервере и отображаются в превью устройства. Доставка на реальный SmallTV пока не подключена.</p>
               <p id="dirty-note" class="hint" role="status" hidden>Есть несохранённые изменения.</p>
               <div class="save-row"><button class="primary" type="submit">Сохранить настройки</button><button id="discard-settings" class="text-button" type="button">Отменить изменения</button><button id="reload-settings" class="text-button" type="button">Перечитать с сервера</button></div>

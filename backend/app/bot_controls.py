@@ -2,6 +2,7 @@
 from .bot_devices import buttons, intent, owned
 from .device_controls import ControlCommand, apply_control, effective_screen
 from .device_presence import presence_values
+from .display_options import options
 from uuid import uuid5, NAMESPACE_URL
 
 SCREENS={'clock':'🕒 Часы','weather':'🌤 Погода','tamagotchi':'🐾 Питомец','markets':'💱 Курсы'}
@@ -15,13 +16,15 @@ def card(connection,link,settings,now,prefix=''):
     did=device['device_id'];uid=link['user_id']
     is_preview=connection.execute('SELECT 1 FROM device_previews WHERE device_id=?',(did,)).fetchone()
     state='Локальное превью' if is_preview else presence_values(connection,did,settings,now).state
-    active=effective_screen(device)
+    active=effective_screen(device,now)
+    visible=options(device.get('advanced',{})).screens
     title=SCREENS.get(active,{'monitor':'Мониторинг','codex':'Codex'}.get(active,active))
     text=f'Устройство: {device["name"]}\nЭкран: {title}\nЯркость: {device["brightness"]}%\nСвязь устройства: {state}\n\nПрименение на физическом SmallTV пока не подтверждается.'
     def token(action):return 'rctl:'+intent(connection,uid,did,'menu','remote:'+action,now).split(':',1)[1]
     rows=[[('◀️ Назад',token('previous')),('Вперёд ▶️',token('next'))]]
     for pair in [('clock','weather'),('tamagotchi','markets')]:
-        rows.append([(('✓ ' if active==screen else '')+SCREENS[screen],token('screen:'+screen)) for screen in pair])
+        rows.append([(('✓ ' if active==screen else '')+SCREENS[screen],token('screen:'+screen)) for screen in pair if screen in visible])
+    rows=[row for row in rows if row]
     rows += [[('🔅 Темнее',token('dimmer')),('🔆 Ярче',token('brighter'))],
              [('🏠 Главный экран',token('home'))],[('Обновить','remote'),('📱 Выбрать устройство','remote-devices')]]
     return (prefix+'\n\n' if prefix else '')+text,buttons(rows)
@@ -47,6 +50,10 @@ def handle(connection,link,text,settings,now,update_id):
         action=row['value'][7:];screen=None
         if action.startswith('screen:'): action,screen=action.split(':',1)
         command=ControlCommand(request_id=uuid5(NAMESPACE_URL,f'storm:telegram:{who}:{update_id}'),action=action,screen=screen)
-        apply_control(connection,row['device_id'],command,uid,now=now)
+        from fastapi import HTTPException
+        try:apply_control(connection,row['device_id'],command,uid,now=now)
+        except HTTPException as error:
+            if error.status_code!=409:raise
+            return card(connection,link,settings,now,'Этот экран скрыт в настройках веб-панели.')
         return card(connection,link,settings,now)
     return card(connection,link,settings,now)

@@ -1,4 +1,5 @@
 // Pure preview state. Cached settings survive a network outage, never an access denial.
+import {resolveScreen} from '../shared/display-options.mjs';
 import { CLOCK_DEFAULTS, clockSettings } from '../shared/clock.mjs';
 export const DEFAULT_SETTINGS = Object.freeze({ brightness: 70, theme: 'BlackArch Red', start_screen: 'clock', ...CLOCK_DEFAULTS });
 export const THEMES = Object.freeze({
@@ -41,7 +42,7 @@ export class PreviewSettings {
     finally { this.refreshing = false; }
   }
 
-  get screen() { return this.settings.current_screen || this.settings.start_screen; }
+  get screen() { return resolveScreen({...this.settings,advanced:this.draftAdvanced||this.settings.advanced,...(this.draftAnchor?{screen_changed_at:this.draftAnchor}:{})}); }
   get theme() { return THEMES[this.settings.theme] || 'red'; }
   get screenTitle() { return SCREENS[this.screen] || 'Неизвестный экран'; }
   get canDisplaySettings() { return this.state !== 'loading'; }

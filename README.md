@@ -1,5 +1,8 @@
 # Storm OS
 
+Свои палитры, превью, фоны, пульт панели, расписания и другие расширенные
+настройки: [docs/advanced-display-settings.md](docs/advanced-display-settings.md).
+
 Быстрый пульт экранов и яркости в боте: [docs/device-controls.md](docs/device-controls.md).
 
 Общие стили устройства, четыре вида часов, сетевой значок и экран курсов:
@@ -101,7 +104,8 @@ python3 -m venv .venv
 По умолчанию сервер слушает только `127.0.0.1`; доступ из LAN не настраивается.
 Для просмотра симулятора при запуске на Debian откройте браузер на самом Debian.
 
-Часы — локальное время браузера, не эмуляция NTP/RTC ESP8266.
+По умолчанию часы используют пояс браузера; другой пояс выбирается в расширенных
+настройках. Это не эмуляция NTP/RTC ESP8266.
 Автономный `/simulator/` не требует входа. В настройках зарегистрированного
 устройства в панели есть ссылка «Открыть превью устройства»:
 `/simulator/?device=<id>` читает сохранённые настройки через защищённый API.
@@ -339,14 +343,14 @@ Windows:
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest
-node --test tests/simulator.test.mjs tests/panel.test.mjs tests/branding.test.mjs tests/site-theme.test.mjs tests/pet-display.test.mjs
+node --test tests/*.test.mjs
 ```
 
 Debian:
 
 ```bash
 .venv/bin/python -m pytest
-node --test tests/simulator.test.mjs tests/panel.test.mjs tests/branding.test.mjs tests/site-theme.test.mjs tests/pet-display.test.mjs
+node --test tests/*.test.mjs
 ```
 
 Node.js 20+ нужен только для JavaScript-тестов; симулятор работает в современном

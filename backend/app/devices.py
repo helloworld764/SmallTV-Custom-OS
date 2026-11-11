@@ -1,9 +1,12 @@
 """Owner-scoped device reads and settings updates; enrollment is a separate router."""
 
+import json
+import time
+from .display_options import DisplayOptions
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator, field_validator
 
 from .auth import Principal, current_user, write_user
 
@@ -39,10 +42,18 @@ class SettingsView(BaseModel):
     device_style: Literal["classic", "minimal", "terminal", "orbit"]
     clock_layout: Literal["regular", "tall", "stacked", "analog"]
     current_screen: str | None = None
+    advanced: dict = Field(default_factory=dict)
+    screen_changed_at: int = 0
+
+    @field_validator('advanced',mode='before')
+    @classmethod
+    def decode_options(cls,value):
+        return json.loads(value) if isinstance(value,str) else value
 
 
 class SettingsPatch(BaseModel):
     model_config = ConfigDict(extra="forbid")
+    advanced: DisplayOptions | None = None
     brightness: int | None = Field(default=None, strict=True, ge=0, le=100)
     theme: Theme | None = None
     start_screen: Screen | None = None
@@ -138,6 +149,14 @@ def save_settings(connection,device_id,payload,user_id,role='user'):
         WHERE devices.id=? AND (owner_id=? OR ?='super_admin')''',(device_id,user_id,role)).fetchone()
     if allowed is None:
         raise HTTPException(404,'Device settings not found')
+    if 'advanced' in changes:
+        changes['advanced']=json.dumps(payload.advanced.model_dump())
+        changes['screen_changed_at']=int(time.time())
+    elif 'theme' in changes:
+        current=json.loads(connection.execute('SELECT advanced FROM device_settings WHERE device_id=?',(device_id,)).fetchone()[0])
+        if current.get('custom_colors'):
+            current['custom_colors']=False
+            changes['advanced']=json.dumps(current)
     assignments=', '.join(f'{column} = ?' for column in changes)
     connection.execute(f'UPDATE device_settings SET {assignments} WHERE device_id=?',(*changes.values(),device_id))
     connection.execute("INSERT INTO audit_log(actor_id,action,resource_id) VALUES (?,'device.settings.updated',?)",(user_id,device_id))

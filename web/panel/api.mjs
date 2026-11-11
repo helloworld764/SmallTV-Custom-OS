@@ -1,3 +1,4 @@
+import { displayOptions } from '../shared/display-options.mjs';
 import { clockSettings } from '../shared/clock.mjs';
 
 export class ApiError extends Error {
@@ -146,13 +147,15 @@ function settingsData(value, expectedId) {
       || value.device_id !== expectedId || typeof value.theme !== 'string' || typeof value.start_screen !== 'string') {
     throw new ApiError(502, 'protocol');
   }
-  try { return { ...value, ...clockSettings(value) }; }
+  try { displayOptions(value.advanced||{}); return { ...value, ...clockSettings(value) }; }
   catch { throw new ApiError(502, 'protocol'); }
 }
 
 export function changesFrom(previous, draft) {
-  return Object.fromEntries(['brightness', 'theme', 'start_screen', 'clock_format', 'clock_seconds', 'clock_style', 'device_style', 'clock_layout']
+  const result = Object.fromEntries(['brightness', 'theme', 'start_screen', 'clock_format', 'clock_seconds', 'clock_style', 'device_style', 'clock_layout']
     .filter(key => draft[key] !== previous[key]).map(key => [key, draft[key]]));
+  if(Object.hasOwn(draft,'advanced') && JSON.stringify(displayOptions(previous.advanced||{})) !== JSON.stringify(draft.advanced)) result.advanced=draft.advanced;
+  return result;
 }
 
 export function hasDraftChanges(previous, draft) {

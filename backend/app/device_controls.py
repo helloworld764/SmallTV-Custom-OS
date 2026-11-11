@@ -6,6 +6,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, model_validator
 from .auth import Principal, write_user
+from .display_options import screen_for, options
 
 router=APIRouter(prefix='/api/v1/devices',tags=['device control'])
 SCREEN_ORDER=('clock','weather','tamagotchi','markets')
@@ -22,9 +23,8 @@ class ControlCommand(BaseModel):
             raise ValueError('A screen is required only for screen actions')
         return self
 
-def effective_screen(settings):
-    value=settings['current_screen'] or settings['start_screen']
-    return 'tamagotchi' if value=='null' else value
+def effective_screen(settings,now=None):
+    return screen_for(settings,now)
 
 def apply_control(connection,device_id,command,user_id,role='user',now=None):
     now=int(time.time()) if now is None else now
@@ -41,15 +41,19 @@ def apply_control(connection,device_id,command,user_id,role='user',now=None):
         return {**json.loads(old['result']),'replayed':True}
     action=command.action
     if action in ('next','previous'):
-        active=effective_screen(settings)
-        index=SCREEN_ORDER.index(active) if active in SCREEN_ORDER else (-1 if action=='next' else 0)
-        settings['current_screen']=SCREEN_ORDER[(index+(1 if action=='next' else -1))%len(SCREEN_ORDER)]
-    elif action=='screen':settings['current_screen']=command.screen
+        active=effective_screen(settings,now)
+        order=options(settings.get('advanced',{})).screens
+        index=order.index(active) if active in order else (-1 if action=='next' else 0)
+        settings['current_screen']=order[(index+(1 if action=='next' else -1))%len(order)]
+    elif action=='screen':
+        if command.screen not in options(settings.get('advanced',{})).screens:raise HTTPException(409,'Screen is hidden in device settings')
+        settings['current_screen']=command.screen
     elif action=='home':settings['current_screen']=None
     elif action=='dimmer':settings['brightness']=max(0,settings['brightness']-10)
     elif action=='brighter':settings['brightness']=min(100,settings['brightness']+10)
-    connection.execute('UPDATE device_settings SET current_screen=?,brightness=? WHERE device_id=?',
-                       (settings['current_screen'],settings['brightness'],device_id))
+    if action in ('next','previous','screen','home'):settings['screen_changed_at']=now
+    connection.execute('UPDATE device_settings SET current_screen=?,brightness=?,screen_changed_at=? WHERE device_id=?',
+                       (settings['current_screen'],settings['brightness'],settings['screen_changed_at'],device_id))
     settings['clock_seconds']=bool(settings['clock_seconds'])
     result={'device_id':device_id,'settings':settings,'replayed':False,'saved_on_server':True}
     connection.execute('INSERT INTO device_control_requests VALUES (?,?,?,?,?,?)',

@@ -84,3 +84,19 @@ html[data-site-theme=light] #device-presence[data-state=STALE], html[data-site-t
 #enrollment-result { font-size: 14px; overflow-wrap: anywhere; }
 @media(max-width: 1210px) { main { padding: 28px 24px 48px; }.login-layout { gap: 48px; padding-inline: 12px; } }
 @media(max-width: 760px) { .topbar { height: 72px; }.brand-caption { display:none; }.brand { font-size: 20px; }.simulator-link { font-size: 11px; }.login-layout { grid-template-columns: 1fr; gap: 26px; padding: 10px 0; }.intro h1 { font-size: 32px; }.display-motif, .intro-note { display:none; }.lead { margin-bottom: 0; }.login-card { padding: 25px; }.dashboard-heading { align-items:start; flex-direction:column; }.account { width:100%; justify-content:space-between; }.workspace { grid-template-columns: 1fr; }.settings-card { padding:24px; }.weather-form-row { align-items: stretch; flex-direction: column; }.save-row { gap: 8px; flex-direction:column; }.page-footer { flex-direction:column; }h1 { font-size:29px; } }
+.advanced-group { border:1px solid #7775; border-radius:12px; padding:12px; margin:12px 0; }
+.advanced-group summary { font-weight:650; cursor:pointer; margin-bottom:10px; }
+.advanced-group label { display:block; margin:10px 0; }
+.advanced-group input[type=checkbox] { width:auto; margin-right:8px; }
+.color-row { display:flex; align-items:center; gap:8px; }
+.color-row label { flex:1; }.color-row input[type=color] { width:64px; height:40px; padding:2px; }
+.color-row > input { width:110px; }
+.palette-swatches { display:grid; grid-template-columns:repeat(8,1fr); gap:7px; margin:12px 0; }
+.palette-swatches button { width:100%; height:26px; min-width:0; padding:0; border:1px solid #8888; border-radius:7px; }
+.advanced-group button { margin:4px; }.screen-order-row { display:flex; align-items:center; gap:4px; }
+.screen-order-row label { flex:1; }.screen-order-row button { padding:5px 12px; }
+.device-draft-preview { width:100%; height:340px; border:0; border-radius:12px; background:#111114; }
+.remote-buttons { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; margin-bottom:18px; }
+.web-remote { margin-top:16px; }
+.advanced-group .advanced-checkbox { display:flex; align-items:center; gap:8px; }
+.advanced-group .advanced-checkbox input { display:inline-block; width:18px; height:18px; min-height:18px; padding:0; margin:0; flex:none; }

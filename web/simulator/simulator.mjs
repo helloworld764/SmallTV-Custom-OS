@@ -1,3 +1,5 @@
+import {applyOptions} from './options-render.mjs';
+import {displayOptions,withinSchedule} from '../shared/display-options.mjs';
 import { Connection, checkHealth } from './connection.mjs';
 import { CLOCK_STYLES } from '../shared/clock.mjs';
 import { renderWeather } from './weather-render.mjs';
@@ -8,6 +10,9 @@ import { Notifications, readNotifications } from './notifications.mjs';
 import { drawPetFrame, petPresentation, PET_SHEETS } from './pet-display.mjs';
 
 const connection = new Connection();
+const embedded=new URLSearchParams(location.search).get('embedded')==='1' && window.parent!==window;
+let draftOptions=null,draftBasic={};
+const liveSettings=()=>({...preview.settings,...draftBasic,brightness:preview.canDisplaySettings?(draftBasic.brightness??preview.settings.brightness):0,advanced:draftOptions||preview.settings.advanced||{}});
 const deviceId = new URLSearchParams(window.location.search).get('device');
 const preview = new PreviewSettings(deviceId);
 const notifications = new Notifications(deviceId);
@@ -102,10 +107,12 @@ function drawCurrentPet() {
 
 function renderPreview() {
   const settings = preview.settings;
-  renderClock(document, settings);
-  document.querySelector('.display').dataset.theme = preview.theme;
+  renderClock(document, liveSettings());
+  const options=applyOptions(document,liveSettings());
+  notifications.duration=options.notification_seconds*1000;
+  notifications.quiet=options.quiet_enabled&&withinSchedule(new Date(),options.timezone,options.quiet_start,options.quiet_end);
+  document.querySelector('.display').dataset.theme = THEMES[liveSettings().theme]||preview.theme;
   document.querySelector('.display').dataset.screen = preview.screen;
-  document.querySelector('#screen-content').style.opacity = preview.canDisplaySettings ? settings.brightness / 100 : 0;
   const clock = preview.screen === 'clock';
   document.querySelector('#weather-content').hidden = preview.screen !== 'weather';
   if (preview.screen === 'weather') {
@@ -278,7 +285,16 @@ async function poll() {
 
 function tick() {
   const now = new Date();
-  renderClock(document, preview.settings, now);
+  const settings=liveSettings();
+  const options=applyOptions(document,settings,now);
+  renderClock(document,settings,now);
+  notifications.duration=options.notification_seconds*1000;
+  notifications.quiet=options.quiet_enabled && withinSchedule(now,options.timezone,options.quiet_start,options.quiet_end);
+  if(preview.screen!==document.querySelector('.display').dataset.screen)renderPreview();
+  const bubble=document.querySelector('#pet-bubble');
+  const age=performance.now(); const showing=preview.screen==='tamagotchi'&&currentPet?.lifecycle==='ACTIVE'&&currentPet.emotion!=='sleepy'&&(!currentPet.reaction||currentPet.reaction.expires_at<=currentPet.server_time);
+  bubble.hidden=!(options.pet_phrases&&showing&&age>=180000&&age%180000<4000);
+  if(!bubble.hidden)bubble.textContent=['Ты справишься!','Рад тебя видеть','Сделаем маленький перерыв?','Шаг за шагом!'][Math.floor(age/180000)%4];
   connection.age(now.getTime());
   const message = notifications.tick(performance.now());
   notice.textContent = message ?? '';
@@ -293,6 +309,19 @@ function renderNetwork() {
 }
 window.addEventListener('online', renderNetwork);
 window.addEventListener('offline', renderNetwork);
+if(embedded)document.body.classList.add('embedded');
+window.addEventListener('message',event=>{
+  if(!embedded || event.origin!==location.origin || event.source!==window.parent || event.data?.deviceId!==deviceId)return;
+  if(event.data.type==='storm-draft-options'){
+    if(event.data.draft===false){draftOptions=null;draftBasic={};preview.draftAdvanced=null;preview.draftAnchor=null;document.querySelector('#draft-label').hidden=false;document.querySelector('#draft-label').textContent='Сохранённые настройки';renderPreview();return;}
+    try{
+      const basic=event.data.basic||{};
+      if(!THEMES[basic.theme]||!['classic','minimal','terminal','orbit'].includes(basic.device_style)||!['regular','tall','stacked','analog'].includes(basic.clock_layout)||!['12h','24h'].includes(basic.clock_format)||typeof basic.clock_seconds!=='boolean'||!Number.isInteger(basic.brightness)||basic.brightness<0||basic.brightness>100)return;
+      draftBasic=Object.fromEntries(['theme','device_style','clock_layout','clock_format','clock_seconds','brightness'].map(k=>[k,basic[k]]));
+      draftOptions=displayOptions(event.data.options);preview.draftAdvanced=draftOptions;preview.draftAnchor=event.data.draft?Date.now()/1000:null;document.querySelector('#draft-label').hidden=false;document.querySelector('#draft-label').textContent=event.data.draft?'Черновик · не сохранён':'Сохранённые настройки';renderPreview();}catch{/* Invalid drafts never execute. */}
+  }
+  if(event.data.type==='storm-draft-notice')notifications.enqueue({id:'draft:'+performance.now(),text:'Пример уведомления',priority:400,expiresAt:performance.now()+10000},performance.now());
+});
 renderNetwork();
 tick();
 renderPreview();

@@ -1,3 +1,4 @@
+import { AdvancedEditor } from './advanced.mjs';
 import { ApiClient, ApiError, changesFrom, hasDraftChanges } from './api.mjs';
 import { EnrollmentFlow } from './enrollment.mjs';
 import { DevicePresence, presenceText } from './device-presence.mjs';
@@ -5,6 +6,7 @@ import { DevicePresence, presenceText } from './device-presence.mjs';
 const $ = selector => document.querySelector(selector);
 const state = { session: null, devices: [], selected: null, settings: null, busy: false, more: false, loaded: 0, presence: null };
 let telegramCodeTimer;
+const advancedEditor=new AdvancedEditor($('#settings-form'));
 
 function clearTelegramCode() {
   clearTimeout(telegramCodeTimer);
@@ -100,7 +102,7 @@ async function enrollmentAction(action) {
 
 function draft() {
   return { brightness: $('#brightness').value, theme: $('#theme').value, start_screen: $('#start-screen').value,
-    clock_format: $('#clock-format').value, clock_seconds: $('#clock-seconds').checked, clock_style: state.settings.clock_style, device_style: $('#device-style').value, clock_layout: $('#clock-style').value };
+    advanced: advancedEditor.read(false), clock_format: $('#clock-format').value, clock_seconds: $('#clock-seconds').checked, clock_style: state.settings.clock_style, device_style: $('#device-style').value, clock_layout: $('#clock-style').value };
 }
 
 function settingsDirty() {
@@ -291,6 +293,8 @@ function renderSettings() {
   $('#clock-seconds').checked = state.settings.clock_seconds;
   $('#clock-style').value = state.settings.clock_layout;
   $('#device-style').value = state.settings.device_style;
+  advancedEditor.render(state.settings,state.selected);
+  for(const button of document.querySelectorAll('[data-control][data-screen]'))button.hidden=!advancedEditor.base.screens.includes(button.dataset.screen);
   $('#settings-form').hidden = false;
   $('#dirty-note').hidden = true;
 }
@@ -525,10 +529,12 @@ $('#discard-settings').addEventListener('click', () => {
   $('#save-result').textContent = 'Несохранённые изменения отменены.';
 });
 $('#settings-form').addEventListener('input', () => {
+  advancedEditor.send();
   $('#save-result').textContent = '';
   $('#dirty-note').hidden = !settingsDirty();
 });
 $('#brightness').addEventListener('input', () => { $('#brightness-range').value = $('#brightness').value; });
+$('#theme').addEventListener('change',()=>{advancedEditor.get('custom_colors').checked=false;advancedEditor.changed();});
 $('#brightness-range').addEventListener('input', () => { $('#brightness').value = $('#brightness-range').value; });
 $('#settings-form').addEventListener('submit', event => {
   event.preventDefault();
@@ -562,5 +568,15 @@ setInterval(() => {
 window.addEventListener('pageshow', event => { if (event.persisted) run(bootstrap); });
 window.addEventListener('beforeunload', event => {
   if (dirty()) { event.preventDefault(); event.returnValue = ''; }
+});
+for(const button of document.querySelectorAll('[data-control]')) button.addEventListener('click',()=>{
+  if(!state.settings||state.busy)return;
+  if(settingsDirty()){message('Сохраните или отмените черновик перед использованием пульта.');return;}
+  const requestId=crypto.randomUUID();
+  run(async()=>{
+    await api.request(`/api/v1/devices/${encodeURIComponent(state.selected)}/control`,{method:'POST',headers:{'X-CSRF-Token':state.session.csrf_token},body:{request_id:requestId,action:button.dataset.control,...(button.dataset.screen?{screen:button.dataset.screen}:{})}});
+    state.settings=await api.settings(state.selected);renderSettings();
+    $('#web-remote-status').textContent='Команда сохранена. Превью обновляется автоматически.';
+  });
 });
 run(bootstrap);

@@ -210,11 +210,13 @@ def device_state(device_id: str, request: Request, identity: Annotated[str, Depe
     if device_id != identity:
         raise HTTPException(404, 'Device not found')
     with request.app.state.database.connection() as connection:
-        settings = connection.execute('SELECT brightness, theme, start_screen, clock_format, clock_seconds, clock_style, device_style, clock_layout, current_screen FROM device_settings WHERE device_id = ?', (identity,)).fetchone()
+        settings = connection.execute('SELECT brightness, theme, start_screen, clock_format, clock_seconds, clock_style, device_style, clock_layout, current_screen, advanced, screen_changed_at FROM device_settings WHERE device_id = ?', (identity,)).fetchone()
     if settings is None:
         raise HTTPException(404, 'Device settings not found')
     values = dict(settings)
     values['clock_seconds'] = bool(values['clock_seconds'])
+    from .display_options import options
+    values['advanced'] = options(values['advanced']).model_dump(exclude_unset=True)
     return {'device_id': identity, 'settings': values}
 
 

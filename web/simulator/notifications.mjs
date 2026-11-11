@@ -10,6 +10,7 @@ const terminal = kind => Object.hasOwn(MESSAGES, kind);
 export class Notifications {
   constructor(deviceId) {
     this.deviceId = deviceId;
+    this.duration=4000; this.quiet=false;
     this.reset();
   }
 
@@ -26,7 +27,8 @@ export class Notifications {
     if (item.expiresAt <= now || this.seen.has(item.id)) return;
     this.seen.set(item.id, item.expiresAt);
     if (this.seen.size > 128) this.seen.delete(this.seen.keys().next().value);
-    this.queue.push({ ...item, order: this.order++, duration: 4000 });
+    if(this.quiet && item.priority<300)return;
+    this.queue.push({ ...item, order: this.order++, duration: this.duration });
     this.queue.sort((a, b) => b.priority - a.priority || a.order - b.order);
     this.queue = this.queue.slice(0, 8);
   }
@@ -62,7 +64,8 @@ export class Notifications {
   }
 
   tick(now) {
-    this.queue = this.queue.filter(item => item.expiresAt > now);
+    this.queue = this.queue.filter(item => item.expiresAt > now && (!this.quiet || item.priority>=300));
+    if(this.quiet && this.active?.priority<300)this.active=null;
     if (this.active && this.active.until <= now) this.active = null;
     if (this.active && this.queue[0]?.priority > this.active.priority) {
       this.queue.push({ ...this.active, duration: this.active.until - now });
