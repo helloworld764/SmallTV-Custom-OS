@@ -113,7 +113,8 @@ summary { cursor: pointer; }
 #wifi[data-state=offline] .wifi-slash { display:block; }
 /* Compact alternate faces keep the date and weather on the same screen. */
 .display[data-clock-layout=tall] #clock { font: 500 42px/.95 ui-monospace,monospace !important; letter-spacing:-2px; transform:scale(.85,1.2); padding:5px 0; }
-.display[data-clock-layout=stacked] #clock { white-space:pre-line; font:600 35px/.95 ui-monospace,monospace !important; letter-spacing:-1px; text-align:center; }
+.display[data-clock-layout=stacked] #clock { position:relative; white-space:pre-line; font:600 35px/.95 ui-monospace,monospace !important; letter-spacing:-1px; text-align:center; }
+.display[data-clock-layout=stacked] #clock::after { content:attr(data-seconds); position:absolute; left:calc(50% + 27px); bottom:1px; font:400 14px/18px ui-monospace,monospace; letter-spacing:0; opacity:.6; }
 .display[data-clock-layout=stacked] .clock-face { padding:3px; }
 .display[data-clock-layout=stacked] .terminal-command,.display[data-clock-layout=analog] .terminal-command,
 .display[data-clock-layout=stacked] .terminal-foot,.display[data-clock-layout=analog] .terminal-foot { display:none; }

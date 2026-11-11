@@ -80,6 +80,17 @@ document.fonts.ready.then(() => {
       bottom = box.bottom;
     }
     const clock = cell.querySelector('#clock');
+    if (entry.layout === 'stacked') {
+      const text = clock.firstChild;
+      const hours = document.createRange(), minutes = document.createRange();
+      hours.setStart(text,0); hours.setEnd(text,2);
+      minutes.setStart(text,3); minutes.setEnd(text,5);
+      const h = hours.getBoundingClientRect(), m = minutes.getBoundingClientRect();
+      if (Math.abs((h.left+h.right)-(m.left+m.right)) > 1) failures.push(label + ': minutes not centered under hours');
+      const seconds = getComputedStyle(clock,'::after');
+      if (parseFloat(seconds.fontSize) >= parseFloat(getComputedStyle(clock).fontSize)/2) failures.push(label + ': seconds too large');
+      if (clock.dataset.seconds !== (entry.seconds ? '08' : '')) failures.push(label + ': incorrect small seconds');
+    }
     if (entry.layout !== 'analog' && clock.scrollWidth > clock.clientWidth+1) failures.push(label + ': time clipped');
     const clockBox = clock.getBoundingClientRect(), dateBox = cell.querySelector('#date').getBoundingClientRect();
     if (entry.layout !== 'analog' && clockBox.bottom > dateBox.top) failures.push(label + ': time/date overlap');

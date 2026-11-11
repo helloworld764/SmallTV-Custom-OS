@@ -21,11 +21,12 @@ export function renderClock(root, settings, now = new Date()) {
     }
   }
   const digits = root.querySelector('#clock');
+  digits.setAttribute?.('data-seconds', '');
   digits.hidden = options.clock_layout === 'analog';
   if (options.clock_layout === 'stacked') {
     const [hours,minutes,seconds] = clock.time.split(':');
     digits.textContent = hours + '\n' + minutes;
-    if (seconds) digits.textContent += ' ·' + seconds;
+    digits.setAttribute?.('data-seconds', seconds || '');
   }
   const period = root.querySelector('#clock-period');
   period.textContent = clock.period;
