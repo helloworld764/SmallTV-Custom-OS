@@ -5,7 +5,7 @@ from .device_presence import presence_values
 from .display_options import options
 from uuid import uuid5, NAMESPACE_URL
 
-SCREENS={'clock':'🕒 Часы','weather':'🌤 Погода','tamagotchi':'🐾 Питомец','markets':'💱 Курсы'}
+SCREENS={'clock':'🕒 Часы','weather':'🌤 Погода','tamagotchi':'🐾 Питомец','markets':'💱 Курсы','codex':'⌘ Codex'}
 
 def accepts(text):
     return text in ('Управление','/control','remote','remote-devices') or text.startswith(('remote-device:','rctl:'))
@@ -22,7 +22,7 @@ def card(connection,link,settings,now,prefix=''):
     text=f'Устройство: {device["name"]}\nЭкран: {title}\nЯркость: {device["brightness"]}%\nСвязь устройства: {state}\n\nПрименение на физическом SmallTV пока не подтверждается.'
     def token(action):return 'rctl:'+intent(connection,uid,did,'menu','remote:'+action,now).split(':',1)[1]
     rows=[[('◀️ Назад',token('previous')),('Вперёд ▶️',token('next'))]]
-    for pair in [('clock','weather'),('tamagotchi','markets')]:
+    for pair in [('clock','weather'),('tamagotchi','markets'),('codex',)]:
         rows.append([(('✓ ' if active==screen else '')+SCREENS[screen],token('screen:'+screen)) for screen in pair if screen in visible])
     rows=[row for row in rows if row]
     rows += [[('🔅 Темнее',token('dimmer')),('🔆 Ярче',token('brighter'))],

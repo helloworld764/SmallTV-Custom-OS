@@ -1,4 +1,4 @@
-export const DISPLAY_DEFAULTS=Object.freeze({custom_colors:false,background:'#080809',text:'#f4f4f6',accent:'#ff5264',palettes:[],backdrop:'solid',screens:['clock','weather','tamagotchi','markets'],auto_rotate:false,rotate_seconds:30,night_enabled:false,night_start:'22:00',night_end:'08:00',night_brightness:20,timezone:'local',date_format:'long',weekday:true,day_progress:true,notification_seconds:4,quiet_enabled:false,quiet_start:'23:00',quiet_end:'08:00',pet_phrases:true,pet_motion:'normal'});
+export const DISPLAY_DEFAULTS=Object.freeze({custom_colors:false,background:'#080809',text:'#f4f4f6',accent:'#ff5264',palettes:[],backdrop:'solid',screens:['clock','weather','tamagotchi','markets','codex'],auto_rotate:false,rotate_seconds:30,night_enabled:false,night_start:'22:00',night_end:'08:00',night_brightness:20,timezone:'local',date_format:'long',weekday:true,day_progress:true,notification_seconds:4,quiet_enabled:false,quiet_start:'23:00',quiet_end:'08:00',pet_phrases:true,pet_motion:'normal'});
 export const ZONES=['local','UTC','Europe/Moscow','Europe/London','Europe/Berlin','Asia/Dubai','Asia/Tokyo','America/New_York'];
 export function displayOptions(value={}) {
   const o={...structuredClone(DISPLAY_DEFAULTS),...value};
@@ -8,7 +8,7 @@ export function displayOptions(value={}) {
   for(const [key,min,max] of [['rotate_seconds',10,600],['night_brightness',0,100],['notification_seconds',2,10]])if(!Number.isInteger(o[key])||o[key]<min||o[key]>max)throw new Error('Invalid range');
   for(const key of ['night_start','night_end','quiet_start','quiet_end'])if(!/^(?:[01][0-9]|2[0-3]):[0-5][0-9]$/.test(o[key]))throw new Error('Invalid time');
   if((o.night_enabled&&o.night_start===o.night_end)||(o.quiet_enabled&&o.quiet_start===o.quiet_end))throw new Error('Schedule endpoints must differ');
-  if(!Array.isArray(o.screens)||!o.screens.length||o.screens.length>4||new Set(o.screens).size!==o.screens.length||o.screens.some(s=>!['clock','weather','tamagotchi','markets'].includes(s)))throw new Error('Invalid screen order');
+  if(!Array.isArray(o.screens)||!o.screens.length||o.screens.length>5||new Set(o.screens).size!==o.screens.length||o.screens.some(s=>!['clock','weather','tamagotchi','markets','codex'].includes(s)))throw new Error('Invalid screen order');
   if(!Array.isArray(o.palettes)||o.palettes.length>8||o.palettes.some(p=>typeof p.name!=='string'||!p.name.trim()||p.name.length>24||![p.background,p.text,p.accent].every(color)))throw new Error('Invalid palettes');
   return o;
 }
@@ -25,7 +25,7 @@ export function withinSchedule(now,zone,start,end) {
 export function resolveScreen(settings,now=Date.now()) {
   const o=displayOptions(settings.advanced||{});let base=settings.current_screen||settings.start_screen;
   if(base==='null')base='tamagotchi';
-  if(!o.screens.includes(base)&&!['monitor','codex'].includes(base))base=o.screens[0];
+  if(!o.screens.includes(base)&&!['monitor'].includes(base))base=o.screens[0];
   if(o.auto_rotate){const index=Math.max(0,o.screens.indexOf(base));const steps=Math.floor(Math.max(0,now/1000-(settings.screen_changed_at??now/1000))/o.rotate_seconds);return o.screens[(index+steps)%o.screens.length];}
   return base;
 }

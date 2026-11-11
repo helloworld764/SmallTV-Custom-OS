@@ -1,3 +1,4 @@
+import {CodexScreen,renderCodex} from './codex-screen.mjs';
 import {applyOptions} from './options-render.mjs';
 import {displayOptions,withinSchedule} from '../shared/display-options.mjs';
 import { Connection, checkHealth } from './connection.mjs';
@@ -16,6 +17,8 @@ const liveSettings=()=>({...preview.settings,...draftBasic,brightness:preview.ca
 const deviceId = new URLSearchParams(window.location.search).get('device');
 const preview = new PreviewSettings(deviceId);
 const notifications = new Notifications(deviceId);
+const codexScreen=new CodexScreen(deviceId);
+let codexBusy=false,codexAttempt=-Infinity;
 const api = new ApiClient({ timeout: 2500 });
 const indicator = document.querySelector('#indicator');
 const checked = document.querySelector('#checked');
@@ -121,7 +124,13 @@ function renderPreview() {
     if (preview.state === 'fresh') void pollForecast();
   }
   document.querySelector('#clock-content').hidden = !clock;
-  document.querySelector('#placeholder').hidden = clock || ['tamagotchi','markets','weather'].includes(preview.screen);
+  document.querySelector('#codex-content').hidden = preview.screen !== 'codex';
+  if(preview.screen==='codex'){
+    if(['signed-out','unavailable'].includes(preview.state))codexScreen.fail(401);
+    renderCodex(document,codexScreen.view(performance.now()),options.timezone);
+    if(preview.state==='fresh')void pollCodex();
+  }
+  document.querySelector('#placeholder').hidden = clock || ['tamagotchi','markets','weather','codex'].includes(preview.screen);
   document.querySelector('#markets-content').hidden = preview.screen !== 'markets';
   if (preview.screen === 'markets' && preview.state === 'fresh') void pollMarkets();
   document.querySelector('#screen-title').textContent = preview.screenTitle;
@@ -145,6 +154,15 @@ function render() {
   if (connection.lastSuccess !== null) {
     checked.textContent = `Последняя успешная проверка: ${new Date(connection.lastSuccess).toLocaleTimeString('ru-RU')}`;
   }
+}
+
+async function pollCodex() {
+  if(codexBusy||document.hidden||performance.now()-codexAttempt<3000||!deviceId)return;
+  codexAttempt=performance.now();codexBusy=true;
+  try{codexScreen.apply(await api.request(`/api/v1/devices/${encodeURIComponent(deviceId)}/codex`),performance.now());}
+  catch(error){codexScreen.fail(error.status);}
+  finally{codexBusy=false;}
+  if(preview.screen==='codex')renderCodex(document,codexScreen.view(performance.now()),displayOptions(liveSettings().advanced).timezone);
 }
 
 async function pollMarkets() {
@@ -249,6 +267,7 @@ async function poll() {
         if ([401, 403, 404].includes(error.status)) {
           preview.fail(error.status);
           notifications.reset();
+          codexScreen.fail(error.status);
           notice.hidden = true;
           notice.textContent = '';
           eventStatus.textContent = 'Для уведомлений нужен доступ к выбранному устройству.';
@@ -268,6 +287,7 @@ async function poll() {
       }
     } else {
       preview.fail();
+      codexScreen.fail();
       if (petTimer !== null) clearTimeout(petTimer);
       petTimer = null;
       currentPet = null;
@@ -295,6 +315,7 @@ function tick() {
   const age=performance.now(); const showing=preview.screen==='tamagotchi'&&currentPet?.lifecycle==='ACTIVE'&&currentPet.emotion!=='sleepy'&&(!currentPet.reaction||currentPet.reaction.expires_at<=currentPet.server_time);
   bubble.hidden=!(options.pet_phrases&&showing&&age>=180000&&age%180000<4000);
   if(!bubble.hidden)bubble.textContent=['Ты справишься!','Рад тебя видеть','Сделаем маленький перерыв?','Шаг за шагом!'][Math.floor(age/180000)%4];
+  if(preview.screen==='codex')renderCodex(document,codexScreen.view(performance.now()),options.timezone);
   connection.age(now.getTime());
   const message = notifications.tick(performance.now());
   notice.textContent = message ?? '';
@@ -330,7 +351,7 @@ setInterval(() => {
   if (!deviceId || document.hidden || connection.state !== 'online' || preview.state !== 'fresh') return;
   void refreshPreviewSettings().catch(error => {
     preview.fail(error.status);
-    if ([401,403,404].includes(error.status)) { notifications.reset(); currentPet = null; }
+    if ([401,403,404].includes(error.status)) { notifications.reset(); currentPet = null; codexScreen.fail(error.status); }
     renderPreview();
   });
 }, 1000);

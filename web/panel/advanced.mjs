@@ -1,5 +1,5 @@
 import {displayOptions,DISPLAY_DEFAULTS,ZONES,contrast} from '../shared/display-options.mjs';
-const LABELS={clock:'Часы',weather:'Погода',tamagotchi:'Питомец',markets:'Курсы'};
+const LABELS={clock:'Часы',weather:'Погода',tamagotchi:'Питомец',markets:'Курсы',codex:'Codex'};
 const COLORS=['#ff5264','#ff8a50','#ffb547','#ffe66d','#d4ed50','#85e06f','#39d9aa','#38d9d9','#56c6ff','#70a7ff','#6486ff','#7c5cfc','#ac78ff','#cc96fa','#f086cc','#ff83ab','#ffffff','#d3dae6','#a4b3c8','#6e8aa6','#366b83','#297267','#a56d4d','#e1c89c'];
 export class AdvancedEditor {
   constructor(form,onInput) {

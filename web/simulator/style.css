@@ -182,3 +182,40 @@ summary { cursor: pointer; }
 .embedded .case { padding:8px; margin:0; border:0; border-radius:8px; }
 .embedded #draft-label { font:10px/14px system-ui,sans-serif; margin:0 0 4px; }
 @media (prefers-reduced-motion: reduce) { .display #pet-art { animation:none !important; } }
+.display[data-screen=codex] #screen-content { height:184px; margin-top:8px; }
+.display[data-screen=codex] footer { display:none; }
+#codex-content { height:184px; display:flex; flex-direction:column; gap:6px; }
+.codex-top { display:flex; justify-content:space-between; gap:5px; color:var(--screen-accent); font:8px/12px ui-monospace,monospace; }
+#codex-link { font:7px/12px system-ui,sans-serif; border-bottom:1px solid var(--screen-accent); white-space:nowrap; }
+.codex-hero { display:flex; align-items:center; justify-content:space-between; gap:5px; height:59px; flex-shrink:0; padding:5px 6px; border:1px solid color-mix(in srgb,var(--screen-accent) 35%,transparent); border-radius:10px; background:linear-gradient(120deg,color-mix(in srgb,var(--screen-accent) 12%,var(--screen-bg)),var(--screen-bg)); }
+.codex-status-block { flex:1; min-width:0; }
+.codex-command { display:none; font:8px/11px ui-monospace,monospace; color:var(--screen-accent); }
+#codex-status { display:block; font:650 17px/20px system-ui,sans-serif; }
+.codex-mascot { width:44px; height:44px; flex:none; fill:none; stroke:var(--screen-text); stroke-width:1.5; opacity:.8; }
+.codex-activity { height:8px; display:flex; gap:3px; margin-top:5px; align-items:center; opacity:.25; }
+.codex-activity i { width:13px; height:2px; background:var(--screen-accent); }
+#codex-content[data-state=WORKING] .codex-activity { opacity:1; }
+#codex-content[data-state=WORKING] .codex-activity i { animation:codex-pulse 2s ease-in-out infinite; }
+#codex-content[data-state=WORKING] .codex-activity i:nth-child(2n) { animation-delay:.3s; }
+#codex-content[data-state=WORKING] .codex-mascot { animation:codex-float 6s ease-in-out infinite; }
+.codex-clock { padding:3px 8px; border-left:2px solid var(--screen-accent); }
+.codex-clock > span { display:block; font:7px/10px system-ui,sans-serif; letter-spacing:1px; opacity:.7; }
+#codex-duration { display:block; font:450 29px/32px ui-monospace,monospace; letter-spacing:-1px; }
+.codex-meta { display:grid; grid-template-columns:minmax(0,1fr) 65px; gap:8px; }
+.codex-meta span { display:block; font:6px/9px system-ui,sans-serif; letter-spacing:1px; opacity:.6; }
+.codex-meta strong { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font:10px/14px system-ui,sans-serif; }
+#codex-hint { margin-top:auto; font:9px/12px system-ui,sans-serif; color:var(--screen-text); opacity:.75; }
+.display[data-device-style=minimal] .codex-hero { background:none; border:0; border-radius:0; padding-inline:0; }
+.display[data-device-style=minimal] #codex-status { font-weight:400; }
+.display[data-device-style=minimal] .codex-clock { border-left:0; border-top:2px solid var(--screen-accent); padding-inline:0; }
+.display[data-device-style=minimal] #codex-duration { font:250 33px/34px system-ui,sans-serif; }
+.display[data-device-style=terminal] .codex-hero { background:none; border-style:dashed; border-radius:0; }
+.display[data-device-style=terminal] .codex-command { display:block; }
+.display[data-device-style=terminal] #codex-status { font:600 15px/18px ui-monospace,monospace; }
+.display[data-device-style=terminal] .codex-clock { border:1px dashed var(--screen-accent); }
+.display[data-device-style=terminal] #codex-hint { font-family:ui-monospace,monospace; font-size:8px; }
+.display[data-device-style=orbit] .codex-hero { border-radius:22px 4px; }
+.display[data-device-style=orbit] .codex-clock { border:1px solid var(--screen-accent); border-radius:5px 22px; text-align:center; background:radial-gradient(ellipse at right,color-mix(in srgb,var(--screen-accent) 12%,transparent),transparent); }
+@keyframes codex-pulse { 50% { opacity:.3; transform:scaleY(2); } }
+@keyframes codex-float { 50% { transform:translateY(-1px); } }
+@media (prefers-reduced-motion: reduce) { #codex-content .codex-activity i,#codex-content .codex-mascot { animation:none !important; } }

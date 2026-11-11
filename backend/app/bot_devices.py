@@ -10,7 +10,7 @@ from .devices import SettingsPatch, save_settings
 
 THEMES={'BlackArch Red':'Красно-чёрная','Dark Blue':'Синяя','Purple':'Фиолетовая','Light':'Светлая'}
 SCREENS={'clock':'Часы','tamagotchi':'Tamagotchi','weather':'Погода','monitor':'Debian Monitor — заглушка',
-         'markets':'Курсы валют','codex':'Codex — заглушка'}
+         'markets':'Курсы валют','codex':'Codex'}
 TOP_LEVEL=('Управление','Мои устройства','Питомец','Настройки','Помощь')
 CLOCK_FORMATS={'24h':'24 часа','12h':'12 часов (AM/PM)'}
 CLOCK_STYLES={'classic':'Классический','minimal':'Минимализм','terminal':'Терминал'}

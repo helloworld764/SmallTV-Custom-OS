@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 Color=Annotated[str,Field(pattern=r'^#[0-9a-fA-F]{6}$')]
 ClockTime=Annotated[str,Field(pattern=r'^(?:[01][0-9]|2[0-3]):[0-5][0-9]$')]
-ScreenName=Literal['clock','weather','tamagotchi','markets']
+ScreenName=Literal['clock','weather','tamagotchi','markets','codex']
 ZONES=('local','UTC','Europe/Moscow','Europe/London','Europe/Berlin','Asia/Dubai','Asia/Tokyo','America/New_York')
 
 class Palette(BaseModel):
@@ -24,7 +24,7 @@ class DisplayOptions(BaseModel):
     accent:Color='#ff5264'
     palettes:list[Palette]=Field(default_factory=list,max_length=8)
     backdrop:Literal['solid','gradient','grid','stars']='solid'
-    screens:list[ScreenName]=Field(default_factory=lambda:['clock','weather','tamagotchi','markets'],min_length=1,max_length=4)
+    screens:list[ScreenName]=Field(default_factory=lambda:['clock','weather','tamagotchi','markets','codex'],min_length=1,max_length=5)
     auto_rotate:bool=Field(default=False,strict=True)
     rotate_seconds:int=Field(default=30,ge=10,le=600,strict=True)
     night_enabled:bool=Field(default=False,strict=True)
@@ -59,7 +59,7 @@ def screen_for(settings,now=None):
     config=options(settings.get('advanced',{}))
     value=settings['current_screen'] or settings['start_screen']
     if value=='null':value='tamagotchi'
-    if value not in config.screens and value not in ('monitor','codex'):value=config.screens[0]
+    if value not in config.screens and value not in ('monitor',):value=config.screens[0]
     if config.auto_rotate:
         index=config.screens.index(value) if value in config.screens else 0
         elapsed=max(0,now-settings.get('screen_changed_at',now))

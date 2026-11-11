@@ -10,12 +10,12 @@ def command(client,headers,action,screen=None,key=None,device='alice-tv'):
 def test_cycle_home_and_brightness_keep_start_screen(env):
     client,_,_,_=env;headers=csrf(env)
     assert client.patch('/api/v1/devices/alice-tv/settings',headers=headers,json={'start_screen':'clock'}).status_code==200
-    for expected in ['weather','tamagotchi','markets','clock']:
+    for expected in ['weather','tamagotchi','markets','codex','clock']:
         result=command(client,headers,'next').json()
         assert result['settings']['current_screen']==expected
         assert result['settings']['start_screen']=='clock'
         assert result['saved_on_server'] and not result['replayed']
-    assert command(client,headers,'previous').json()['settings']['current_screen']=='markets'
+    assert command(client,headers,'previous').json()['settings']['current_screen']=='codex'
     assert command(client,headers,'screen','weather').json()['settings']['current_screen']=='weather'
     assert command(client,headers,'home').json()['settings']['current_screen'] is None
     client.patch('/api/v1/devices/alice-tv/settings',headers=headers,json={'brightness':95})

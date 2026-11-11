@@ -1,10 +1,12 @@
 # Storm OS — серверные события Codex
 
 Это собственный протокол Storm OS для локального Windows Monitor. Он не является
-проверенным API Codex CLI. Постоянный Monitor всех сессий, экран Codex,
+проверенным API Codex CLI. Постоянный Monitor всех сессий и
 общая очередь доставки на устройство ещё не реализованы. Для браузерного превью
 есть узкая проекция конечных событий с TTL и оверлеями:
 [simulator-notifications.md](simulator-notifications.md).
+Постоянный экран ограниченного Windows-моста реализован:
+[codex-screen.md](codex-screen.md).
 Добавлен ограниченный локальный мост run-smoke/run-task с очередью/heartbeat:
 [local-monitor.md](local-monitor.md). Постоянный Monitor произвольных задач
 не реализован. Автотесты используют программные события в изолированном backend.

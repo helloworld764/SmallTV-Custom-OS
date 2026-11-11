@@ -9,13 +9,13 @@ from .auth import Principal, write_user
 from .display_options import screen_for, options
 
 router=APIRouter(prefix='/api/v1/devices',tags=['device control'])
-SCREEN_ORDER=('clock','weather','tamagotchi','markets')
+SCREEN_ORDER=('clock','weather','tamagotchi','markets','codex')
 
 class ControlCommand(BaseModel):
     model_config=ConfigDict(extra='forbid')
     request_id: UUID
     action: Literal['next','previous','screen','dimmer','brighter','home']
-    screen: Literal['clock','weather','tamagotchi','markets'] | None = None
+    screen: Literal['clock','weather','tamagotchi','markets','codex'] | None = None
 
     @model_validator(mode='after')
     def screen_matches_action(self):

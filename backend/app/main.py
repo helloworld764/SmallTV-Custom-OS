@@ -27,6 +27,7 @@ from .telegram import router as telegram_router
 from .markets import router as markets_router
 from .weather_forecast import router as forecast_router
 from .device_controls import router as controls_router
+from .codex_screen import router as codex_screen_router
 
 
 class Health(BaseModel):
@@ -92,6 +93,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(markets_router)
     app.include_router(forecast_router)
     app.include_router(controls_router)
+    app.include_router(codex_screen_router)
 
     @app.get("/health", response_model=Health)
     def health(response: Response) -> Health:
