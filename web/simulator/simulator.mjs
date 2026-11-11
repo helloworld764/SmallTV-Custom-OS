@@ -23,6 +23,7 @@ const petCanvas = document.querySelector('#pet-art');
 const petContext = petCanvas.getContext('2d');
 const petImages = new Map();
 let currentPet = null;
+let marketAttempt = 0, marketBusy = false;
 let weatherLastAttempt = 0;
 let petError = 'Питомец ещё не загружен.';
 let petTimer = null;
@@ -104,8 +105,11 @@ function renderPreview() {
   document.querySelector('#screen-content').style.opacity = preview.canDisplaySettings ? settings.brightness / 100 : 0;
   const clock = settings.start_screen === 'clock';
   document.querySelector('#clock-content').hidden = !clock;
-  document.querySelector('#placeholder').hidden = clock || settings.start_screen === 'tamagotchi';
+  document.querySelector('#placeholder').hidden = clock || ['tamagotchi','markets'].includes(settings.start_screen);
+  document.querySelector('#markets-content').hidden = settings.start_screen !== 'markets';
+  if (settings.start_screen === 'markets' && preview.state === 'fresh') void pollMarkets();
   document.querySelector('#screen-title').textContent = preview.screenTitle;
+  document.querySelector('.codex-symbol').hidden = settings.start_screen !== 'codex';
   drawCurrentPet();
   const labels = {
     standalone: 'Автономное превью часов. Откройте превью из настроек устройства, чтобы читать их с сервера.',
@@ -125,6 +129,33 @@ function render() {
   if (connection.lastSuccess !== null) {
     checked.textContent = `Последняя успешная проверка: ${new Date(connection.lastSuccess).toLocaleTimeString('ru-RU')}`;
   }
+}
+
+async function pollMarkets() {
+  if (marketBusy || Date.now() - marketAttempt < 60_000) return;
+  marketAttempt = Date.now(); marketBusy = true;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8000);
+  try {
+    const response = await fetch('/api/v1/markets', {signal:controller.signal, cache:'no-store'});
+    if (!response.ok) throw new Error('Market unavailable');
+    const data = await response.json();
+    if (!Array.isArray(data.rows) || data.rows.length !== 5) throw new Error('Invalid rates');
+    const container = document.querySelector('#market-rows'); container.replaceChildren();
+    for (const row of data.rows) {
+      const line = document.createElement('div'); line.className = 'market-row';
+      const label = document.createElement('span'), value = document.createElement('strong');
+      label.textContent = row.symbol;
+      value.textContent = row.price === null ? '—' : Number(row.price).toLocaleString('ru-RU', {maximumFractionDigits:2}) + (row.unit === 'RUB' ? ' ₽' : ' $') + (row.stale ? ' *' : '');
+      line.append(label,value);container.append(line);
+    }
+    document.querySelector('#market-status').textContent = data.rows.some(row => row.price === null) ? 'Часть курсов недоступна' : data.rows.some(row => row.stale) ? '* Устаревшие данные' : 'Крипто: USD · Валюты: RUB';
+    const fiat = data.rows.find(row => row.symbol === 'USD');
+    document.querySelector('.market-source').textContent = 'CoinGecko · ЦБ ' + (fiat.source_date || 'РФ');
+  } catch {
+    document.querySelector('#market-rows').replaceChildren();
+    document.querySelector('#market-status').textContent = 'Курсы временно недоступны';
+  } finally { clearTimeout(timer); marketBusy = false; }
 }
 
 async function pollWeather() {
@@ -222,6 +253,14 @@ function tick() {
   render();
 }
 
+function renderNetwork() {
+  const wifi = document.querySelector('#wifi');
+  wifi.dataset.state = navigator.onLine ? 'online' : 'offline';
+  wifi.setAttribute('aria-label', navigator.onLine ? 'Сеть браузера доступна; Wi-Fi устройства не проверен' : 'Браузер без сети');
+}
+window.addEventListener('online', renderNetwork);
+window.addEventListener('offline', renderNetwork);
+renderNetwork();
 tick();
 renderPreview();
 setInterval(tick, 1000);

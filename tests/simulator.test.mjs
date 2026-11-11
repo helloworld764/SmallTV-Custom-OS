@@ -6,13 +6,33 @@ import { Notifications, readNotifications } from '../web/simulator/notifications
 import { CLOCK_DEFAULTS, CLOCK_STYLES, formatClock } from '../web/shared/clock.mjs';
 import { renderClock } from '../web/simulator/clock-render.mjs';
 
+test('device style is independent of stacked and analog clock faces', () => {
+  const hands = Object.fromEntries(['hour','minute','second'].map(name => ['.'+name,{style:{}}]));
+  const analog = { querySelector: key => hands[key], setAttribute() {} };
+  const nodes = { '.display':{dataset:{}}, '#clock':{}, '#clock-period':{}, '#analog-clock':analog };
+  const root = {querySelector:key => nodes[key]};
+  const now = new Date(2026,10,11,12,15,30);
+  renderClock(root, {device_style:'orbit',clock_layout:'stacked',clock_seconds:false}, now);
+  assert.equal(nodes['#clock'].textContent,'12\n15');
+  assert.equal(nodes['.display'].dataset.deviceStyle,'orbit');
+  renderClock(root, {device_style:'terminal',clock_layout:'analog',clock_seconds:false}, now);
+  assert.equal(analog.hidden,false);
+  assert.equal(nodes['#clock'].hidden,true);
+  assert.equal(hands['.hour'].style.transform,'rotate(7.5deg)');
+  assert.equal(hands['.minute'].style.transform,'rotate(90deg)');
+  assert.equal(hands['.second'].hidden,true);
+  renderClock(root, {device_style:'minimal',clock_layout:'regular'}, now);
+  assert.equal(analog.hidden,true);
+  assert.equal(nodes['#clock'].hidden,false);
+});
+
 test('clock settings immediately update the rendered DOM and restore previous styles cleanly', () => {
   const nodes = { '.display': { dataset: {} }, '#clock': {}, '#clock-period': {} };
   const root = { querySelector: selector => nodes[selector] };
   const now = new Date(2026, 10, 10, 13, 5, 9);
   for (const style of ['classic', 'minimal', 'terminal', 'classic']) {
     renderClock(root, { clock_style: style, clock_format: '12h', clock_seconds: false }, now);
-    assert.deepEqual(nodes['.display'].dataset, { clockStyle: style, clockSeconds: 'false' });
+    assert.deepEqual(nodes['.display'].dataset, { clockStyle: style, clockSeconds: 'false', deviceStyle:style, clockLayout:'regular' });
     assert.equal(nodes['#clock'].textContent, '01:05');
     assert.equal(nodes['#clock-period'].textContent, 'PM');
     assert.equal(nodes['#clock-period'].hidden, false);
@@ -257,7 +277,7 @@ test('network outage keeps cached settings stale and recovery replaces them', ()
   preview.apply(initial, 1000);
   preview.fail(0);
   assert.equal(preview.state, 'stale');
-  assert.deepEqual(preview.settings, { ...initial, ...CLOCK_DEFAULTS });
+  assert.deepEqual(preview.settings, { ...initial, ...CLOCK_DEFAULTS, device_style:'classic', clock_layout:'regular' });
   preview.apply({ ...initial, brightness: 50 }, 2000);
   assert.equal(preview.state, 'fresh');
   assert.equal(preview.settings.brightness, 50);

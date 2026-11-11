@@ -10,14 +10,16 @@ from .devices import SettingsPatch, save_settings
 
 THEMES={'BlackArch Red':'Красно-чёрная','Dark Blue':'Синяя','Purple':'Фиолетовая','Light':'Светлая'}
 SCREENS={'clock':'Часы','tamagotchi':'Tamagotchi','weather':'Погода — заглушка','monitor':'Debian Monitor — заглушка',
-         'codex':'Codex — заглушка','null':'Null — заглушка'}
+         'markets':'Курсы валют','codex':'Codex — заглушка'}
 TOP_LEVEL=('Мои устройства','Питомец','Настройки','Помощь')
 CLOCK_FORMATS={'24h':'24 часа','12h':'12 часов (AM/PM)'}
 CLOCK_STYLES={'classic':'Классический','minimal':'Минимализм','terminal':'Терминал'}
+DEVICE_STYLES={'classic':'Классический','minimal':'Минимализм','terminal':'Терминал','orbit':'Орбита'}
+CLOCK_LAYOUTS={'regular':'Обычный','tall':'Увеличенный','stacked':'Минуты под часами','analog':'Со стрелками'}
 CLOCK_SECONDS={'1':'Показывать секунды','0':'Без секунд'}
-GROUPS={'clock':('Часы',(('Формат часов','clock_format'),('Секунды','clock_seconds'),('Стиль часов','clock_style'))),
+GROUPS={'clock':('Часы',(('Формат часов','clock_format'),('Секунды','clock_seconds'),('Вид часов','clock_layout'))),
         'screen':('Экран',(('Яркость','brightness'),('Стартовый экран','start_screen'))),
-        'appearance':('Оформление',(('Тема','theme'),))}
+        'appearance':('Оформление',(('Тема','theme'),('Стиль устройства','device_style')))}
 FIELD_GROUP={field:group for group,(_,fields) in GROUPS.items() for _,field in fields}
 
 
@@ -57,10 +59,10 @@ def card(connection,link,now,prefix='',section=None):
     text=f'Устройство: {device["name"]}\n'
     if section=='clock':
         text+=(f'Часы: {CLOCK_FORMATS[device["clock_format"]]}, {"с секундами" if device["clock_seconds"] else "без секунд"}\n'
-               f'Стиль часов: {CLOCK_STYLES[device["clock_style"]]}')
+               f'Стиль часов: {CLOCK_LAYOUTS[device["clock_layout"]]}')
     elif section=='screen':
         text+=f'Яркость: {device["brightness"]}%\nСтартовый экран: {SCREENS.get(device["start_screen"],device["start_screen"])}'
-    elif section=='appearance': text+=f'Тема: {device["theme"]}'
+    elif section=='appearance': text+=f'Тема: {device["theme"]} · {DEVICE_STYLES[device["device_style"]]}'
     else:
         section=None
         text+='Выберите раздел настроек.'
@@ -112,7 +114,7 @@ def handle(connection,link,text,now,callback=False):
                 return 'Введите яркость целым числом от 0 до 100. На ввод есть 5 минут. 0 скрывает содержимое экрана, индикатор связи сохраняется.',buttons([[('Отмена',intent(connection,uid,did,'menu','section:screen',now))]])
             device=owned(connection,uid,did)
             options={'theme':THEMES,'start_screen':SCREENS,'clock_format':CLOCK_FORMATS,
-                     'clock_seconds':CLOCK_SECONDS,'clock_style':CLOCK_STYLES,
+                     'clock_seconds':CLOCK_SECONDS,'clock_style':CLOCK_STYLES,'clock_layout':CLOCK_LAYOUTS,'device_style':DEVICE_STYLES,
                      'brightness':{str(v):f'{v}%' for v in (0,10,25,50,75,100)}}.get(field)
             if options is None: return card(connection,link,now,'Настройка недоступна.')
             rows=[[(('✓ ' if str(device[field])==str(value) else '')+label,intent(connection,uid,did,field,value,now,str(device[field])))]

@@ -95,20 +95,21 @@
           <p id="settings-loading" class="muted" hidden>Загружаем настройки…</p>
           <form id="settings-form" hidden>
             <fieldset id="settings-fields">
-              <div class="field-row"><div><label for="brightness">Яркость</label><p class="hint">От 0 до 100%</p></div><div class="number-field"><input id="brightness" name="brightness" type="number" min="0" max="100" step="1" required><span>%</span></div></div>
+              <h3>Экран</h3><div class="field-row"><div><label for="brightness">Яркость</label><p class="hint">От 0 до 100%</p></div><div class="number-field"><input id="brightness" name="brightness" type="number" min="0" max="100" step="1" required><span>%</span></div></div>
               <input id="brightness-range" class="range" type="range" min="0" max="100" step="1" aria-label="Ползунок яркости">
-              <div class="form-divider"></div>
-              <label for="theme">Тема оформления</label>
-              <select id="theme" name="theme"><option>BlackArch Red</option><option>Dark Blue</option><option>Purple</option><option>Light</option></select>
               <label for="start-screen">Стартовый экран</label>
-              <select id="start-screen" name="start_screen"><option value="clock">Часы</option><option value="weather">Погода</option><option value="monitor">Мониторинг</option><option value="codex">Codex</option><option value="null">Null</option><option value="tamagotchi">Tamagotchi</option></select>
+              <select id="start-screen" name="start_screen"><option value="clock">Часы</option><option value="weather">Погода</option><option value="monitor">Мониторинг</option><option value="codex">Codex</option><option value="markets">Курсы валют</option><option value="tamagotchi">Tamagotchi</option></select>
+              <div class="form-divider"></div>
+              <h3>Оформление устройства</h3><label for="theme">Тема оформления</label>
+              <select id="theme" name="theme"><option>BlackArch Red</option><option>Dark Blue</option><option>Purple</option><option>Light</option></select>
+              <label for="device-style">Стиль устройства</label><select id="device-style"><option value="classic">Классический</option><option value="minimal">Минимализм</option><option value="terminal">Терминал</option><option value="orbit">Орбита</option></select>
               <div class="form-divider"></div>
               <h3>Оформление часов</h3>
               <label for="clock-format">Формат времени</label>
               <select id="clock-format" name="clock_format"><option value="24h">24 часа</option><option value="12h">12 часов (AM/PM)</option></select>
               <label class="checkbox-label" for="clock-seconds"><input id="clock-seconds" name="clock_seconds" type="checkbox" checked> Показывать секунды</label>
               <label for="clock-style">Стиль часов</label>
-              <select id="clock-style" name="clock_style"><option value="classic">Классический</option><option value="minimal">Минимализм</option><option value="terminal">Терминал</option></select>
+              <select id="clock-style" name="clock_layout"><option value="regular">Обычный</option><option value="tall">Увеличенный</option><option value="stacked">Минуты под часами</option><option value="analog">Со стрелками</option></select>
               <p class="hint">Комбинируйте стиль, формат и секунды по своему вкусу. Часы используют часовой пояс браузера; погода под датой сохраняется.</p>
               <p class="hint">Настройки сохраняются на сервере и отображаются в превью устройства. Доставка на реальный SmallTV пока не подключена.</p>
               <p id="dirty-note" class="hint" role="status" hidden>Есть несохранённые изменения.</p>

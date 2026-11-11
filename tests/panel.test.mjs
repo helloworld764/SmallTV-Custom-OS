@@ -30,7 +30,7 @@ test('invalid server clock options cannot enter the panel while legacy settings 
     await assert.rejects(api.settings('device-test'), error => error.kind === 'protocol');
   }
   const api = new ApiClient({ fetcher: async () => reply({ device_id: 'device-test', brightness: 70, theme: 'BlackArch Red', start_screen: 'clock' }) });
-  assert.deepEqual(await api.settings('device-test'), settings);
+  assert.deepEqual(await api.settings('device-test'), { ...settings, device_style:'classic', clock_layout:'regular' });
 });
 
 test('device rename uses CSRF and JSON while presence reads never send a heartbeat', async () => {

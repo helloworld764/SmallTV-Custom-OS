@@ -53,6 +53,20 @@ def csrf(env):
     return {'X-CSRF-Token': sign_in(env).json()['csrf_token']}
 
 
+def test_appearance_is_owner_scoped_and_market_api_requires_session(env, monkeypatch):
+    client, _, _, _ = env
+    assert client.get('/api/v1/markets').status_code == 401
+    headers = csrf(env)
+    change = {'device_style': 'orbit', 'clock_layout': 'analog', 'start_screen': 'markets'}
+    assert client.patch('/api/v1/devices/bob-tv/settings', headers=headers, json=change).status_code == 404
+    saved = client.patch('/api/v1/devices/alice-tv/settings', headers=headers, json=change)
+    assert saved.status_code == 200
+    assert all(saved.json()[k] == v for k,v in change.items())
+    from backend.app import markets
+    monkeypatch.setattr(markets.cache, 'read', lambda: {'rows': [], 'server_time': 1000})
+    assert client.get('/api/v1/markets').status_code == 200
+
+
 def test_device_rename_preserves_identity_settings_and_records_only_changes(env):
     client, app, users, _ = env
     headers = csrf(env)
@@ -288,7 +302,7 @@ def test_settings_update_persists_after_app_restart_with_session(env):
         assert response.status_code == 200
         assert response.json() == {'device_id': 'alice-tv', 'brightness': 0,
                                    'theme': 'Purple', 'start_screen': 'weather',
-                                   'clock_format': '24h', 'clock_seconds': True, 'clock_style': 'classic'}
+                                   'clock_format': '24h', 'clock_seconds': True, 'clock_style': 'classic', 'device_style': 'classic', 'clock_layout': 'regular'}
 
 
 def test_clock_settings_defaults_partial_updates_and_restart(env):

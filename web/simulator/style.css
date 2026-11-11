@@ -38,38 +38,38 @@ header { font-size: 12px; letter-spacing: 2px; color: var(--screen-accent); disp
 .terminal-chrome, .terminal-command, .terminal-prompt, .terminal-foot { display: none; }
 .display[data-clock-seconds=false] #clock { font-size: 46px; }
 /* Minimal: open typography, an asymmetric accent and a quiet weather capsule. */
-.display[data-clock-style=minimal] .clock-topline { font-weight: 500; color: color-mix(in srgb, var(--screen-text) 65%, var(--screen-bg)); }
-.display[data-clock-style=minimal] .clock-topline span:last-child { border: 0; }
-.display[data-clock-style=minimal] .clock-scene { gap: 5px; }
-.display[data-clock-style=minimal] .clock-face { padding: 10px 0 0; border: 0; border-radius: 0; background: none; }
-.display[data-clock-style=minimal] .clock-face::before { top: 4px; left: 0; right: auto; width: 24px; height: 3px; }
-.display[data-clock-style=minimal] #clock { text-align: left; font: 250 43px/1.08 system-ui, sans-serif; font-variant-numeric: tabular-nums; letter-spacing: -2px; }
-.display[data-clock-style=minimal][data-clock-seconds=false] #clock { font-size: 60px; letter-spacing: -3px; }
-.display[data-clock-style=minimal] #clock-period { text-align: left; padding-left: 3px; }
-.display[data-clock-style=minimal] .clock-date-row { justify-content: flex-start; }
-.display[data-clock-style=minimal] #date { font-size: 13px; }
-.display[data-clock-style=minimal] #weather { justify-content: flex-start; border-radius: 18px; }
-.display[data-clock-style=minimal] .clock-day-track { width: 45%; height: 3px; border-radius: 3px; }
+.display[data-device-style=minimal] .clock-topline { font-weight: 500; color: color-mix(in srgb, var(--screen-text) 65%, var(--screen-bg)); }
+.display[data-device-style=minimal] .clock-topline span:last-child { border: 0; }
+.display[data-device-style=minimal] .clock-scene { gap: 5px; }
+.display[data-device-style=minimal] .clock-face { padding: 10px 0 0; border: 0; border-radius: 0; background: none; }
+.display[data-device-style=minimal] .clock-face::before { top: 4px; left: 0; right: auto; width: 24px; height: 3px; }
+.display[data-device-style=minimal] #clock { text-align: left; font: 250 43px/1.08 system-ui, sans-serif; font-variant-numeric: tabular-nums; letter-spacing: -2px; }
+.display[data-device-style=minimal][data-clock-seconds=false] #clock { font-size: 60px; letter-spacing: -3px; }
+.display[data-device-style=minimal] #clock-period { text-align: left; padding-left: 3px; }
+.display[data-device-style=minimal] .clock-date-row { justify-content: flex-start; }
+.display[data-device-style=minimal] #date { font-size: 13px; }
+.display[data-device-style=minimal] #weather { justify-content: flex-start; border-radius: 18px; }
+.display[data-device-style=minimal] .clock-day-track { width: 45%; height: 3px; border-radius: 3px; }
 /* Terminal: local-clock output, not an actual shell or an NTP confirmation. */
-.display[data-clock-style=terminal] .clock-scene { gap: 4px; font-family: ui-monospace, monospace; background-image: linear-gradient(color-mix(in srgb, var(--screen-accent) 4%, transparent) 1px, transparent 1px); background-size: 100% 4px; }
-.display[data-clock-style=terminal] .clock-topline { display: none; }
-.display[data-clock-style=terminal] .terminal-chrome { display: flex; align-items: center; justify-content: space-between; font-size: 8px; line-height: 16px; padding: 0 5px; border: 1px solid color-mix(in srgb, var(--screen-accent) 45%, transparent); color: var(--screen-accent); background: color-mix(in srgb, var(--screen-accent) 10%, var(--screen-bg)); }
+.display[data-device-style=terminal] .clock-scene { gap: 4px; font-family: ui-monospace, monospace; background-image: linear-gradient(color-mix(in srgb, var(--screen-accent) 4%, transparent) 1px, transparent 1px); background-size: 100% 4px; }
+.display[data-device-style=terminal] .clock-topline { display: none; }
+.display[data-device-style=terminal] .terminal-chrome { display: flex; align-items: center; justify-content: space-between; font-size: 8px; line-height: 16px; padding: 0 5px; border: 1px solid color-mix(in srgb, var(--screen-accent) 45%, transparent); color: var(--screen-accent); background: color-mix(in srgb, var(--screen-accent) 10%, var(--screen-bg)); }
 .terminal-dots { font-size: 6px; letter-spacing: 1px; }
-.display[data-clock-style=terminal] .terminal-command { display: flex; align-items: center; gap: 5px; font-size: 10px; line-height: 14px; }
+.display[data-device-style=terminal] .terminal-command { display: flex; align-items: center; gap: 5px; font-size: 10px; line-height: 14px; }
 .terminal-command > span:first-child { color: var(--screen-accent); }
 .terminal-cursor { color: var(--screen-accent); font-size: 10px; }
-.display[data-clock-style=terminal] .clock-face { padding: 4px 0; border: 0; border-top: 1px solid color-mix(in srgb, var(--screen-accent) 25%, transparent); border-bottom: 1px solid color-mix(in srgb, var(--screen-accent) 25%, transparent); border-radius: 0; background: none; }
-.display[data-clock-style=terminal] .clock-face::before { display: none; }
-.display[data-clock-style=terminal] #clock { font: 600 33px/1.05 ui-monospace, monospace; letter-spacing: 0; color: var(--screen-accent); text-shadow: 0 0 10px color-mix(in srgb, var(--screen-accent) 18%, transparent); }
-.display[data-clock-style=terminal][data-clock-seconds=false] #clock { font-size: 46px; }
-.display[data-clock-style=terminal] #clock-period { font-family: ui-monospace, monospace; }
-.display[data-clock-style=terminal] .clock-date-row { justify-content: flex-start; gap: 7px; }
-.display[data-clock-style=terminal] .terminal-prompt { display: inline; color: var(--screen-accent); font-size: 9px; }
-.display[data-clock-style=terminal] #date { font: 10px/14px ui-monospace, monospace; }
-.display[data-clock-style=terminal] #weather { font: 9px/12px ui-monospace, monospace; justify-content: flex-start; padding: 4px; border-radius: 0; background: var(--screen-bg); border-style: dashed; }
-.display[data-clock-style=terminal] #weather-summary { line-height: 12px; max-height: 24px; }
-.display[data-clock-style=terminal] .clock-day-track { display: none; }
-.display[data-clock-style=terminal] .terminal-foot { display: flex; justify-content: space-between; font-size: 7px; line-height: 9px; color: var(--screen-accent); letter-spacing: 1px; }
+.display[data-device-style=terminal] .clock-face { padding: 4px 0; border: 0; border-top: 1px solid color-mix(in srgb, var(--screen-accent) 25%, transparent); border-bottom: 1px solid color-mix(in srgb, var(--screen-accent) 25%, transparent); border-radius: 0; background: none; }
+.display[data-device-style=terminal] .clock-face::before { display: none; }
+.display[data-device-style=terminal] #clock { font: 600 33px/1.05 ui-monospace, monospace; letter-spacing: 0; color: var(--screen-accent); text-shadow: 0 0 10px color-mix(in srgb, var(--screen-accent) 18%, transparent); }
+.display[data-device-style=terminal][data-clock-seconds=false] #clock { font-size: 46px; }
+.display[data-device-style=terminal] #clock-period { font-family: ui-monospace, monospace; }
+.display[data-device-style=terminal] .clock-date-row { justify-content: flex-start; gap: 7px; }
+.display[data-device-style=terminal] .terminal-prompt { display: inline; color: var(--screen-accent); font-size: 9px; }
+.display[data-device-style=terminal] #date { font: 10px/14px ui-monospace, monospace; }
+.display[data-device-style=terminal] #weather { font: 9px/12px ui-monospace, monospace; justify-content: flex-start; padding: 4px; border-radius: 0; background: var(--screen-bg); border-style: dashed; }
+.display[data-device-style=terminal] #weather-summary { line-height: 12px; max-height: 24px; }
+.display[data-device-style=terminal] .clock-day-track { display: none; }
+.display[data-device-style=terminal] .terminal-foot { display: flex; justify-content: space-between; font-size: 7px; line-height: 9px; color: var(--screen-accent); letter-spacing: 1px; }
 #placeholder { text-align: center; padding-top: 12px; }
 #placeholder strong { font-size: 20px; }
 #placeholder p { font-size: 12px; color: var(--screen-text); }
@@ -90,3 +90,48 @@ footer { position: absolute; bottom: 12px; font-size: 9px; letter-spacing: 1px; 
 #notice { white-space: pre-line; font-size: 15px; }
 details { max-width: 500px; }
 summary { cursor: pointer; }
+
+/* Device-wide visual language, independent of the clock layout and palette. */
+.display[data-device-style=classic] { box-shadow: inset 0 0 0 1px color-mix(in srgb,var(--screen-accent) 30%,transparent); }
+.display[data-device-style=minimal] header { border-bottom: 1px solid color-mix(in srgb,var(--screen-text) 15%,transparent); padding-bottom: 3px; }
+.display[data-device-style=terminal] { font-family: ui-monospace,monospace; background-image: repeating-linear-gradient(transparent 0 3px,color-mix(in srgb,var(--screen-accent) 4%,transparent) 3px 4px); }
+.display[data-device-style=terminal] header { border-bottom: 1px dashed var(--screen-accent); }
+.display[data-device-style=terminal] #pet-name::before { content: '> '; }
+.display[data-device-style=terminal] .screen-card { border: 1px dashed var(--screen-accent); }
+.display[data-device-style=orbit] { background-image: radial-gradient(circle at 95% 20%,transparent 50px,color-mix(in srgb,var(--screen-accent) 22%,transparent) 51px,transparent 52px),radial-gradient(circle at 0 100%,color-mix(in srgb,var(--screen-accent) 12%,transparent),transparent 70%); }
+.display[data-device-style=orbit] header { border-bottom: 2px dotted var(--screen-accent); padding-bottom: 3px; }
+.display[data-device-style=orbit] .clock-face,.display[data-device-style=orbit] .screen-card { border-radius: 24px 4px 24px 4px; border: 1px solid var(--screen-accent); }
+.display[data-device-style=orbit] #weather { border-radius: 16px 4px; border-color: var(--screen-accent); }
+.display[data-device-style=orbit] #pet-labels { border-top: 1px dotted var(--screen-accent); }
+.screen-card { border: 1px solid color-mix(in srgb,var(--screen-accent) 35%,transparent); border-radius: 10px; padding: 12px 6px; }
+.codex-symbol { width: 52px; height: 52px; fill: none; stroke: var(--screen-text); stroke-width: 1.5; display: block; margin: 0 auto 6px; }
+.network-icons { display: inline-flex; align-items:center; gap:6px; }
+#wifi { width:15px; height:15px; color:var(--screen-text); }
+#wifi svg { width:100%; height:100%; fill:none; stroke:currentColor; stroke-width:2; }
+#wifi .wifi-slash { display:none; }
+#wifi[data-state=offline] { color:#ff5264; }
+#wifi[data-state=offline] .wifi-slash { display:block; }
+/* Compact alternate faces keep the date and weather on the same screen. */
+.display[data-clock-layout=tall] #clock { font: 500 42px/.95 ui-monospace,monospace !important; letter-spacing:-2px; transform:scale(.85,1.2); padding:5px 0; }
+.display[data-clock-layout=stacked] #clock { white-space:pre-line; font:600 35px/.95 ui-monospace,monospace !important; letter-spacing:-1px; text-align:center; }
+.display[data-clock-layout=stacked] .clock-face { padding:3px; }
+.display[data-clock-layout=stacked] .terminal-command,.display[data-clock-layout=analog] .terminal-command,
+.display[data-clock-layout=stacked] .terminal-foot,.display[data-clock-layout=analog] .terminal-foot { display:none; }
+.display[data-clock-layout=analog] .clock-face { border:0; background:none; padding:0; }
+.display[data-clock-layout=analog] .clock-face::before { display:none; }
+#analog-clock { width:88px; height:88px; margin:auto; position:relative; border:2px solid var(--screen-accent); border-radius:50%; background: repeating-conic-gradient(from -1deg,var(--screen-accent) 0 2deg,transparent 2deg 30deg); }
+#analog-clock::before { content:''; position:absolute; inset:5px; border-radius:50%; background:var(--screen-bg); }
+.dial-number { position:absolute; font:9px/10px ui-monospace,monospace; }
+.n12 { top:6px; left:38px; }.n3 { right:6px; top:39px; }.n6 { bottom:5px; left:41px; }.n9 { left:6px; top:39px; }
+.hand { position:absolute; left:43px; bottom:44px; width:2px; transform-origin:50% 100%; background:var(--screen-text); border-radius:2px; }
+.hand.hour { height:22px; width:3px; }.hand.minute { height:32px; }.hand.second { height:35px; width:1px; background:var(--screen-accent); }
+.pin { position:absolute; left:40px; top:40px; width:8px; height:8px; background:var(--screen-accent); border-radius:50%; }
+
+.display[data-screen=markets] #screen-content { margin-top:10px; height:180px; }
+.display[data-screen=markets] footer { display:none; }
+#markets-content { padding:8px; }
+.market-heading { display:flex; justify-content:space-between; font:9px/16px ui-monospace,monospace; letter-spacing:1px; color:var(--screen-accent); }
+.market-row { display:flex; justify-content:space-between; font:12px/24px ui-monospace,monospace; }
+.market-row:nth-child(4) { border-top:1px solid var(--screen-accent); margin-top:2px; }
+#market-status,.market-source { font:8px/12px system-ui,sans-serif; text-align:center; }
+.market-source { opacity:.65; }

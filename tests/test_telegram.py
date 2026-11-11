@@ -681,7 +681,7 @@ def device_options(env,card,label,now):
     labels=lambda reply:{button['text'] for row in json.loads(reply['markup'])['inline_keyboard'] for button in row}
     if label not in labels(card):
         group={'Тема':'Оформление','Яркость':'Экран','Стартовый экран':'Экран',
-               'Формат часов':'Часы','Секунды':'Часы','Стиль часов':'Часы'}[label]
+               'Формат часов':'Часы','Секунды':'Часы','Вид часов':'Часы','Стиль устройства':'Оформление'}[label]
         if group not in labels(card): card=apply(env,'/device',now=now)[1]
         card=apply(env,pet_button(card,group),callback=True,now=now)[1]
     return apply(env,pet_button(card,label),callback=True,now=now)[1]
@@ -693,13 +693,13 @@ def test_device_settings_are_grouped_and_back_returns_to_clock_section(env):
     labels=lambda reply:[button['text'] for row in json.loads(reply['markup'])['inline_keyboard'] for button in row]
     assert labels(root)==['Часы','Экран','Оформление','Обновить','Список устройств']
     _,clock=apply(env,pet_button(root,'Часы'),callback=True,now=now)
-    assert labels(clock)==['Формат часов','Секунды','Стиль часов','Обновить','Назад']
-    choices=device_options(env,clock,'Стиль часов',now)
+    assert labels(clock)==['Формат часов','Секунды','Вид часов','Обновить','Назад']
+    choices=device_options(env,clock,'Вид часов',now)
     _,back=apply(env,pet_button(choices,'Назад'),callback=True,now=now)
     assert labels(back)==labels(clock)
-    choices=device_options(env,back,'Стиль часов',now)
-    _,saved=apply(env,pet_button(choices,'Терминал'),callback=True,now=now)
-    assert 'Терминал' in saved['text'] and labels(saved)==labels(clock)
+    choices=device_options(env,back,'Вид часов',now)
+    _,saved=apply(env,pet_button(choices,'Увеличенный'),callback=True,now=now)
+    assert 'Увеличенный' in saved['text'] and labels(saved)==labels(clock)
     _,root=apply(env,pet_button(saved,'Назад'),callback=True,now=now)
     _,screen=apply(env,pet_button(root,'Экран'),callback=True,now=now)
     assert labels(screen)==['Яркость','Стартовый экран','Обновить','Назад']
@@ -724,7 +724,8 @@ def test_group_navigation_still_checks_owner_and_expiry(env):
 @pytest.mark.parametrize('label,option,field,value,newer', [
     ('Формат часов','12 часов (AM/PM)','clock_format','12h','24h'),
     ('Секунды','Без секунд','clock_seconds',False,True),
-    ('Стиль часов','Терминал','clock_style','terminal','minimal'),
+    ('Вид часов','Увеличенный','clock_layout','tall','stacked'),
+    ('Стиль устройства','Орбита','device_style','orbit','minimal'),
 ])
 def test_bot_clock_options_share_api_and_repeated_buttons_do_not_undo_panel_changes(env,label,option,field,value,newer):
     link(env); now=int(time.time())
@@ -746,12 +747,12 @@ def test_bot_clock_options_share_api_and_repeated_buttons_do_not_undo_panel_chan
 def test_unused_clock_button_detects_concurrent_panel_update(env):
     link(env); now=int(time.time())
     _,card=apply(env,'device:own-tv',callback=True,now=now)
-    choices=device_options(env,card,'Стиль часов',now)
-    button=pet_button(choices,'Минимализм')
-    env['api'].patch('/api/v1/devices/own-tv/settings',headers=env['csrf'],json={'clock_style':'terminal'})
+    choices=device_options(env,card,'Вид часов',now)
+    button=pet_button(choices,'Увеличенный')
+    env['api'].patch('/api/v1/devices/own-tv/settings',headers=env['csrf'],json={'clock_layout':'stacked'})
     _,stale=apply(env,button,callback=True,now=now)
     assert 'уже изменилась' in stale['text']
-    assert env['api'].get('/api/v1/devices/own-tv/settings').json()['clock_style']=='terminal'
+    assert env['api'].get('/api/v1/devices/own-tv/settings').json()['clock_layout']=='stacked'
 
 
 def test_clock_button_checks_ownership_and_expiry(env):

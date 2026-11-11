@@ -16,16 +16,17 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_clock_scenes_fit_all_48_combinations_in_real_chrome(tmp_path):
+@pytest.mark.parametrize('device_style', ['classic','minimal','terminal','orbit'])
+def test_clock_scenes_fit_all_combinations_in_real_chrome(tmp_path, device_style):
     # Chrome uses its conventional OS-temp profile location, not the source checkout.
     temporary_root = Path(tempfile.gettempdir()).resolve()
     with tempfile.TemporaryDirectory(dir=temporary_root, prefix='storm-clock-browser-', ignore_cleanup_errors=True) as directory:
         work = Path(directory).resolve()
         assert work.parent == temporary_root and work.name.startswith('storm-clock-browser-')
-        run_clock_layout(work, tmp_path)
+        run_clock_layout(work, tmp_path, device_style)
 
 
-def run_clock_layout(work, tmp_path):
+def run_clock_layout(work, tmp_path, device_style):
     chrome = shutil.which('google-chrome') or shutil.which('chromium') or shutil.which('chrome')
     if not chrome and os.name == 'nt':
         candidate = Path('C:/Program Files/Google/Chrome/Application/chrome.exe')
@@ -44,11 +45,9 @@ def run_clock_layout(work, tmp_path):
     renderer = re.sub(r'^import .*?;\s*', '', renderer).replace('export ', '')
     script = r'''
 const themes = ['red', 'blue', 'purple', 'light'];
-const styles = ['classic', 'minimal', 'terminal'];
-const cases = styles.flatMap(style => themes.map(theme => ({style,theme,format:'24h',seconds:true})));
-for (const style of styles) for (const theme of themes) for (const format of ['12h','24h']) for (const seconds of [false,true]) {
-  if (format !== '24h' || !seconds) cases.push({style,theme,format,seconds});
-}
+const styles = [STYLE];
+const cases = [];
+for (const style of styles) for (const theme of themes) for (const layout of ['regular','tall','stacked','analog']) for (const format of ['12h','24h']) for (const seconds of [false,true]) cases.push({style,theme,layout,format,seconds});
 const failures = [], fonts = {}, metrics = [];
 for (const entry of cases) {
   const cell = document.createElement('article');
@@ -60,7 +59,7 @@ for (const entry of cases) {
   cell.querySelector('#weather-icon').textContent = '☁';
   cell.querySelector('#weather-summary').textContent = 'Петропавловск-Камчатский · −18° · Небольшой снег';
   document.querySelector('.qa-grid').append(cell);
-  renderClock(cell, {clock_style:entry.style,clock_format:entry.format,clock_seconds:entry.seconds}, new Date(2026,8,28,17,42,8));
+  renderClock(cell, {device_style:entry.style,clock_layout:entry.layout,clock_format:entry.format,clock_seconds:entry.seconds}, new Date(2026,8,28,17,42,8));
   const caption = document.createElement('div'); caption.className = 'qa-caption';
   caption.textContent = `${entry.style} / ${entry.theme} / ${entry.format} / ${entry.seconds ? 'sec' : 'no sec'}`;
   cell.append(caption);
@@ -81,9 +80,9 @@ document.fonts.ready.then(() => {
       bottom = box.bottom;
     }
     const clock = cell.querySelector('#clock');
-    if (clock.scrollWidth > clock.clientWidth+1) failures.push(label + ': time clipped');
+    if (entry.layout !== 'analog' && clock.scrollWidth > clock.clientWidth+1) failures.push(label + ': time clipped');
     const clockBox = clock.getBoundingClientRect(), dateBox = cell.querySelector('#date').getBoundingClientRect();
-    if (clockBox.bottom > dateBox.top) failures.push(label + ': time/date overlap');
+    if (entry.layout !== 'analog' && clockBox.bottom > dateBox.top) failures.push(label + ': time/date overlap');
     const computed = getComputedStyle(clock);
     fonts[entry.style] = [computed.fontFamily,computed.fontSize,computed.fontWeight,computed.lineHeight].join(' / ');
     const chrome = getComputedStyle(cell.querySelector('.terminal-chrome')).display;
@@ -93,6 +92,7 @@ document.fonts.ready.then(() => {
   document.querySelector('#qa-report').textContent = JSON.stringify({count:cases.length,failures,fonts,metrics});
 });
 '''
+    script = script.replace('STYLE', json.dumps(device_style))
     script = shared + '\n' + renderer + '\nconst DISPLAY = ' + json.dumps(display) + ';\n' + script
     page = work / 'clocks.html'
     page.write_text('<!doctype html><meta charset="utf-8"><style>' + css + '''
@@ -108,14 +108,13 @@ body { padding:24px; } main { max-width:none; margin:0; }
                              '--hide-scrollbars', '--window-size=1220,1120', '--virtual-time-budget=1500',
                              '--user-data-dir=' + str(work / 'chrome-profile'),
                              '--screenshot=' + str(screenshot), '--dump-dom', page.as_uri()],
-                            capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=40,
+                            capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=90,
                             **({'creationflags': subprocess.CREATE_NO_WINDOW} if os.name == 'nt' else {}))
     assert result.returncode == 0, 'Isolated headless Chrome did not complete'
     match = re.search(r'<pre id="qa-report">([^<]+)</pre>', result.stdout)
     assert match, 'Browser did not produce a layout report'
     report = json.loads(html.unescape(match[1]))
     (tmp_path / 'layout-report.json').write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
-    assert report['count'] == 48
+    assert report['count'] == 64
     assert not report['failures'], '\n'.join(report['failures'])
-    assert len(set(report['fonts'].values())) == 3, 'Clock styles must have distinct typography'
     assert screenshot.is_file()

@@ -148,7 +148,7 @@ function settingsData(value, expectedId) {
 }
 
 export function changesFrom(previous, draft) {
-  return Object.fromEntries(['brightness', 'theme', 'start_screen', 'clock_format', 'clock_seconds', 'clock_style']
+  return Object.fromEntries(['brightness', 'theme', 'start_screen', 'clock_format', 'clock_seconds', 'clock_style', 'device_style', 'clock_layout']
     .filter(key => draft[key] !== previous[key]).map(key => [key, draft[key]]));
 }
 

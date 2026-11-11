@@ -5,7 +5,7 @@ export const THEMES = Object.freeze({
   'BlackArch Red': 'red', 'Dark Blue': 'blue', Purple: 'purple', Light: 'light',
 });
 export const SCREENS = Object.freeze({
-  clock: 'Часы', weather: 'Погода', monitor: 'Мониторинг', codex: 'Codex', null: 'Null', tamagotchi: 'Tamagotchi',
+  markets: 'Курсы валют', clock: 'Часы', weather: 'Погода', monitor: 'Мониторинг', codex: 'Codex', tamagotchi: 'Tamagotchi',
 });
 
 export class PreviewSettings {
@@ -18,7 +18,7 @@ export class PreviewSettings {
 
   apply(settings, now) {
     if (settings.device_id !== this.deviceId) throw new Error('Unexpected preview device');
-    this.settings = { ...settings, ...clockSettings(settings) };
+    this.settings = { ...settings, ...clockSettings(settings), start_screen: settings.start_screen === 'null' ? 'tamagotchi' : settings.start_screen };
     this.state = 'fresh';
     this.updatedAt = now;
   }

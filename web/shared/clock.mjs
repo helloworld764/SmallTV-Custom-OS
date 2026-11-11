@@ -6,6 +6,9 @@ export function clockSettings(value = {}) {
     Object.hasOwn(value, key) ? value[key] : fallback]));
   if (!['12h', '24h'].includes(result.clock_format) || typeof result.clock_seconds !== 'boolean'
       || !Object.hasOwn(CLOCK_STYLES, result.clock_style)) throw new Error('Invalid clock settings');
+  result.device_style = Object.hasOwn(value, 'device_style') ? value.device_style : result.clock_style;
+  result.clock_layout = Object.hasOwn(value, 'clock_layout') ? value.clock_layout : 'regular';
+  if (!['classic','minimal','terminal','orbit'].includes(result.device_style) || !['regular','tall','stacked','analog'].includes(result.clock_layout)) throw new Error('Invalid appearance');
   return result;
 }
 

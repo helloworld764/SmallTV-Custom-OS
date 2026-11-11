@@ -242,7 +242,7 @@ def test_complete_lifecycle_and_hash_only_storage(env):
     state = client.get(f'/api/v1/devices/{device_id}/state', headers=device_header(credential))
     assert state.status_code == 200
     assert state.json() == {'device_id': device_id, 'settings': {'brightness': 70, 'theme': 'BlackArch Red', 'start_screen': 'clock',
-                                                             'clock_format': '24h', 'clock_seconds': True, 'clock_style': 'classic'}}
+                                                             'clock_format': '24h', 'clock_seconds': True, 'clock_style': 'classic', 'device_style': 'classic', 'clock_layout': 'regular'}}
     assert client.patch(f'/api/v1/devices/{device_id}/settings', headers=csrf,
                         json={'clock_format': '12h', 'clock_seconds': False, 'clock_style': 'minimal'}).status_code == 200
     clock_state = client.get(f'/api/v1/devices/{device_id}/state', headers=device_header(credential)).json()['settings']

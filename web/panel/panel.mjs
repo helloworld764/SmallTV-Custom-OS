@@ -100,7 +100,7 @@ async function enrollmentAction(action) {
 
 function draft() {
   return { brightness: $('#brightness').value, theme: $('#theme').value, start_screen: $('#start-screen').value,
-    clock_format: $('#clock-format').value, clock_seconds: $('#clock-seconds').checked, clock_style: $('#clock-style').value };
+    clock_format: $('#clock-format').value, clock_seconds: $('#clock-seconds').checked, clock_style: state.settings.clock_style, device_style: $('#device-style').value, clock_layout: $('#clock-style').value };
 }
 
 function settingsDirty() {
@@ -289,7 +289,8 @@ function renderSettings() {
   selectValue($('#start-screen'), state.settings.start_screen);
   $('#clock-format').value = state.settings.clock_format;
   $('#clock-seconds').checked = state.settings.clock_seconds;
-  $('#clock-style').value = state.settings.clock_style;
+  $('#clock-style').value = state.settings.clock_layout;
+  $('#device-style').value = state.settings.device_style;
   $('#settings-form').hidden = false;
   $('#dirty-note').hidden = true;
 }

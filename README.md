@@ -1,5 +1,8 @@
 # Storm OS
 
+Общие стили устройства, четыре вида часов, сетевой значок и экран курсов:
+[docs/device-styles.md](docs/device-styles.md).
+
 **Storm OS** (кратко **Storm**) — система и прошивка для GEEKMAGIC SmallTV-Ultra.
 Веб-панель — **Storm Control Panel**, симулятор 240×240 — **Storm Simulator**,
 будущий единый Telegram-бот — **Storm Bot**. На экране загрузки прошивки используется Storm OS.
