@@ -34,6 +34,13 @@ export class PreviewSettings {
     }
   }
 
+  async refresh(load, now = () => Date.now()) {
+    if (this.refreshing) return false;
+    this.refreshing = true;
+    try { this.apply(await load(), now()); return true; }
+    finally { this.refreshing = false; }
+  }
+
   get screen() { return this.settings.current_screen || this.settings.start_screen; }
   get theme() { return THEMES[this.settings.theme] || 'red'; }
   get screenTitle() { return SCREENS[this.screen] || 'Неизвестный экран'; }

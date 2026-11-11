@@ -50,6 +50,17 @@ def process_update(database, settings, update, now=None):
     if parsed is None:
         return None
     who, text, callback_id = parsed
+    edit_message_id = None
+    if callback_id and bot_controls.accepts(text):
+        message = update['callback_query']['message']
+        sender = message.get('from', {})
+        target = message.get('message_id')
+        with database.connection() as connection:
+            bot_id = connection.execute('SELECT bot_id FROM telegram_worker_state WHERE id=1').fetchone()[0]
+        if (type(target) is not int or not 0 < target < 2**53 or not isinstance(sender,dict)
+                or sender.get('is_bot') is not True or sender.get('id') != bot_id or bot_id is None):
+            return None
+        edit_message_id = target
     now = int(time.time()) if now is None else now
     # Slow provider I/O is outside SQLite's write transaction. Recheck identity below.
     match = city_error = prepared_user = None
@@ -105,7 +116,7 @@ def process_update(database, settings, update, now=None):
         elif bot_controls.accepts(text):
             connection.execute("UPDATE telegram_links SET input_mode='' WHERE telegram_id=?",(who,))
             connection.execute('DELETE FROM telegram_pet_drafts WHERE telegram_id=?',(who,))
-            reply,markup=bot_controls.handle(connection,link,text,settings,now)
+            reply,markup=bot_controls.handle(connection,link,text,settings,now,update['update_id'])
         elif bot_devices.is_device_input(connection, link, text, bool(callback_id)):
             connection.execute("UPDATE telegram_links SET input_mode='' WHERE telegram_id=?",(who,))
             connection.execute('DELETE FROM telegram_pet_drafts WHERE telegram_id=?',(who,))
@@ -126,9 +137,12 @@ def process_update(database, settings, update, now=None):
         if count >= 10:
             connection.execute('DELETE FROM telegram_replies WHERE update_id=(SELECT min(update_id) FROM telegram_replies WHERE telegram_id=?)', (who,))
         photo = markup.pop('_storm_photo', None)
+        if edit_message_id is not None:
+            connection.execute('DELETE FROM telegram_replies WHERE telegram_id=? AND edit_message_id=? AND notification_category IS NULL',
+                               (who,edit_message_id))
         connection.execute('''INSERT INTO telegram_replies
-            (update_id,telegram_id,user_id,text,markup,expires_at,photo_asset) VALUES (?,?,?,?,?,?,?)''',
-            (update['update_id'],who,uid,reply,json.dumps(markup,ensure_ascii=False),now+300,photo))
+            (update_id,telegram_id,user_id,text,markup,expires_at,photo_asset,edit_message_id) VALUES (?,?,?,?,?,?,?,?)''',
+            (update['update_id'],who,uid,reply,json.dumps(markup,ensure_ascii=False),now+300,photo,edit_message_id))
     return callback_id
 
 

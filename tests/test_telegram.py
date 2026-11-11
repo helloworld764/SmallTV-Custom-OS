@@ -43,6 +43,9 @@ def message(env, text, who=101, callback=False):
     sender = {'id':who,'is_bot':False}
     msg = {'chat':{'id':who,'type':'private'}, 'from':sender,'text':text}
     if callback:
+        if text.startswith(('rctl:','remote')):
+            msg['message_id']=77
+            msg['from']={'id':42,'is_bot':True}
         update['callback_query'] = {'id':'test-callback','from':sender,'message':msg,'data':text}
     else:
         update['message'] = msg
@@ -194,6 +197,21 @@ class FakeTelegram:
         if self.failure: raise self.failure
         assert path.is_file()
         return True
+
+
+def test_callback_ack_has_short_timeout_and_edit_method_is_supported():
+    client=TelegramClient('123456:'+('x'*35))
+    timeouts=[]
+    class Reply:
+        def __enter__(self):return self
+        def __exit__(self,*args):return False
+        def read(self,size):return b'{"ok":true,"result":true}'
+    class Opener:
+        def open(self,request,timeout):timeouts.append(timeout);return Reply()
+    client._opener=Opener()
+    assert client.call('answerCallbackQuery',{'callback_query_id':'synthetic'}) is True
+    assert client.call('editMessageText',{'chat_id':101,'message_id':77,'text':'Test'}) is True
+    assert timeouts==[3,35]
 
 
 def test_worker_offsets_delivery_and_retries_do_not_reapply_mutations(env):

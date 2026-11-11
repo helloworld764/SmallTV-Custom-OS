@@ -1,7 +1,8 @@
-"""Quick remote scoped to the account's selected TV and single-use button intents."""
+"""Quick remote scoped to the selected TV with replay-safe Telegram updates."""
 from .bot_devices import buttons, intent, owned
 from .device_controls import ControlCommand, apply_control, effective_screen
 from .device_presence import presence_values
+from uuid import uuid5, NAMESPACE_URL
 
 SCREENS={'clock':'🕒 Часы','weather':'🌤 Погода','tamagotchi':'🐾 Питомец','markets':'💱 Курсы'}
 
@@ -25,7 +26,7 @@ def card(connection,link,settings,now,prefix=''):
              [('🏠 Главный экран',token('home'))],[('Обновить','remote'),('📱 Выбрать устройство','remote-devices')]]
     return (prefix+'\n\n' if prefix else '')+text,buttons(rows)
 
-def handle(connection,link,text,settings,now):
+def handle(connection,link,text,settings,now,update_id):
     uid,who=link['user_id'],link['telegram_id']
     connection.execute('DELETE FROM telegram_device_drafts WHERE telegram_id=?',(who,))
     connection.execute('DELETE FROM telegram_device_intents WHERE expires_at<=?',(now,))
@@ -45,8 +46,7 @@ def handle(connection,link,text,settings,now):
         if row['consumed']:return card(connection,link,settings,now,'Эта команда уже выполнена. Используйте свежую карточку.')
         action=row['value'][7:];screen=None
         if action.startswith('screen:'): action,screen=action.split(':',1)
-        command=ControlCommand(request_id=row['id'],action=action,screen=screen)
+        command=ControlCommand(request_id=uuid5(NAMESPACE_URL,f'storm:telegram:{who}:{update_id}'),action=action,screen=screen)
         apply_control(connection,row['device_id'],command,uid,now=now)
-        connection.execute('UPDATE telegram_device_intents SET consumed=1 WHERE id=?',(row['id'],))
-        return card(connection,link,settings,now,'Команда сохранена. Превью обновится автоматически.')
+        return card(connection,link,settings,now)
     return card(connection,link,settings,now)

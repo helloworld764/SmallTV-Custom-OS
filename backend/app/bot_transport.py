@@ -24,7 +24,7 @@ class TelegramClient:
         self._opener = build_opener(NoRedirect())
 
     def call(self, method, payload=None):
-        if method not in ('getMe', 'getWebhookInfo', 'getUpdates', 'sendMessage', 'answerCallbackQuery'):
+        if method not in ('getMe', 'getWebhookInfo', 'getUpdates', 'sendMessage', 'editMessageText', 'answerCallbackQuery'):
             raise ValueError('Unsupported Telegram method')
         return self._request(method,json.dumps(payload or {}).encode('utf-8'),'application/json')
 
@@ -50,7 +50,7 @@ class TelegramClient:
         request = Request(f'https://api.telegram.org/bot{self._token}/{method}',
                           data=data, headers={'Content-Type': content_type}, method='POST')
         try:
-            with self._opener.open(request, timeout=35) as response:
+            with self._opener.open(request, timeout=3 if method=='answerCallbackQuery' else 35) as response:
                 raw = response.read(1048577)
             if len(raw) > 1048576:
                 raise ValueError('Oversized Telegram response')

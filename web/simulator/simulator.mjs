@@ -204,6 +204,14 @@ async function pollWeather() {
   }
 }
 
+async function refreshPreviewSettings() {
+  const wasPetReady = petScreenIsReady();
+  if (await preview.refresh(() => api.settings(deviceId))) {
+    renderPreview();
+    if (!wasPetReady && petScreenIsReady()) schedulePetPoll(0);
+  }
+}
+
 async function poll() {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 2500);
@@ -224,7 +232,7 @@ async function poll() {
   if (deviceId) {
     if (ok) {
       try {
-        preview.apply(await api.settings(deviceId), Date.now());
+        await refreshPreviewSettings();
         if (preview.screen === 'clock' && Date.now() - weatherLastAttempt >= 60_000) void pollWeather();
         const startedAt = performance.now();
         const page = await readNotifications(api, deviceId, notifications.cursor);
@@ -289,5 +297,13 @@ renderNetwork();
 tick();
 renderPreview();
 setInterval(tick, 1000);
+setInterval(() => {
+  if (!deviceId || document.hidden || connection.state !== 'online' || preview.state !== 'fresh') return;
+  void refreshPreviewSettings().catch(error => {
+    preview.fail(error.status);
+    if ([401,403,404].includes(error.status)) { notifications.reset(); currentPet = null; }
+    renderPreview();
+  });
+}, 1000);
 setInterval(() => { if (deviceId && preview.canDisplaySettings && Date.now() - weatherLastAttempt >= 60_000) void pollWeather(); }, 60_000);
 poll();

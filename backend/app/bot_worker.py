@@ -7,7 +7,7 @@ import os
 import re
 import time
 
-from .bot_handler import process_update
+from .bot_handler import process_update, identity
 from .bot_pets import photo_path
 from .pet_sleep import complete_due_sleeps
 from .pet_needs import scan_needs, current_notice
@@ -58,10 +58,11 @@ def initialize_bot(database, client):
         connection.execute('UPDATE telegram_worker_state SET bot_id=? WHERE id=1', (info['id'],))
 
 
-def deliver_replies(database, client, now=None):
+def deliver_replies(database, client, now=None, edits_only=False):
     now = int(time.time()) if now is None else now
     with database.connection() as connection:
-        rows = connection.execute('SELECT * FROM telegram_replies ORDER BY update_id LIMIT 20').fetchall()
+        rows = connection.execute('SELECT * FROM telegram_replies WHERE (?=0 OR edit_message_id IS NOT NULL) ORDER BY edit_message_id IS NULL,update_id LIMIT 20',
+                                  (int(edits_only),)).fetchall()
     for row in rows:
         with database.connection() as connection:
             link = active_link(connection, row['telegram_id'])
@@ -76,7 +77,10 @@ def deliver_replies(database, client, now=None):
             try:
                 photo = photo_path(row['photo_asset'])
                 markup = json.loads(row['markup'])
-                if photo and photo.is_file():
+                if row['edit_message_id'] is not None:
+                    client.call('editMessageText', {'chat_id': row['telegram_id'], 'message_id': row['edit_message_id'],
+                                                  'text': text, 'reply_markup': markup})
+                elif photo and photo.is_file():
                     client.send_photo({'chat_id': row['telegram_id'], 'caption': text, 'reply_markup': markup}, photo)
                 else:
                     client.call('sendMessage', {'chat_id': row['telegram_id'], 'text': text, 'reply_markup': markup})
@@ -84,8 +88,9 @@ def deliver_replies(database, client, now=None):
                 if error.status not in (400, 403):
                     raise
                 # Permanent delivery denial: disable future notification consent.
-                with database.transaction() as connection:
-                    connection.execute('UPDATE telegram_preferences SET enabled=0 WHERE user_id=?', (row['user_id'],))
+                if row['edit_message_id'] is None or error.status == 403:
+                    with database.transaction() as connection:
+                        connection.execute('UPDATE telegram_preferences SET enabled=0 WHERE user_id=?', (row['user_id'],))
         with database.transaction() as connection:
             connection.execute('DELETE FROM telegram_replies WHERE update_id=?', (row['update_id'],))
 
@@ -103,14 +108,18 @@ def poll_once(database, settings, client):
     for update in updates:
         if not isinstance(update, dict) or type(update.get('update_id')) is not int or not 0 <= update['update_id'] < 2**53:
             raise TelegramError()
-        callback = process_update(database, settings, update)
-        with database.transaction() as connection:
-            connection.execute('UPDATE telegram_worker_state SET next_offset=max(next_offset, ?) WHERE id=1', (update['update_id']+1,))
-        if callback:
+        parsed = identity(update)
+        with database.connection() as connection:
+            seen = connection.execute('SELECT 1 FROM telegram_processed WHERE update_id=?',(update['update_id'],)).fetchone()
+        if parsed and parsed[2] and not seen:
             try:
-                client.call('answerCallbackQuery', {'callback_query_id': callback})
+                client.call('answerCallbackQuery', {'callback_query_id': parsed[2]})
             except TelegramError:
                 pass
+        process_update(database, settings, update)
+        with database.transaction() as connection:
+            connection.execute('UPDATE telegram_worker_state SET next_offset=max(next_offset, ?) WHERE id=1', (update['update_id']+1,))
+        deliver_replies(database, client, edits_only=True)
     complete_due_sleeps(database)
     scan_needs(database)
     deliver_replies(database, client)

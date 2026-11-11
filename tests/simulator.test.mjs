@@ -6,6 +6,21 @@ import { Notifications, readNotifications } from '../web/simulator/notifications
 import { CLOCK_DEFAULTS, CLOCK_STYLES, formatClock } from '../web/shared/clock.mjs';
 import { renderClock } from '../web/simulator/clock-render.mjs';
 
+test('fast settings refresh never overlaps and unlocks after failures', async () => {
+  const preview = new PreviewSettings('tv');
+  let finish, calls=0;
+  const load=() => {calls++;return new Promise(resolve => {finish=resolve;});};
+  const first=preview.refresh(load,()=>1000);
+  assert.equal(await preview.refresh(load),false);
+  assert.equal(calls,1);
+  finish({device_id:'tv',start_screen:'clock',current_screen:'weather'});
+  assert.equal(await first,true);
+  assert.equal(preview.screen,'weather');
+  await assert.rejects(preview.refresh(async () => {throw new Error('offline');}));
+  assert.equal(await preview.refresh(async () => ({device_id:'tv',start_screen:'clock',current_screen:'markets'})),true);
+  assert.equal(preview.screen,'markets');
+});
+
 test('quick control changes active screen independently and home follows startup setting', () => {
   const preview = new PreviewSettings('tv');
   preview.apply({device_id:'tv',start_screen:'clock',current_screen:'weather'},1000);
