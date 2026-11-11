@@ -38,6 +38,7 @@ class SettingsView(BaseModel):
     clock_style: ClockStyle
     device_style: Literal["classic", "minimal", "terminal", "orbit"]
     clock_layout: Literal["regular", "tall", "stacked", "analog"]
+    current_screen: str | None = None
 
 
 class SettingsPatch(BaseModel):

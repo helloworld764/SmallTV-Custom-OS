@@ -18,6 +18,7 @@ export class PreviewSettings {
 
   apply(settings, now) {
     if (settings.device_id !== this.deviceId) throw new Error('Unexpected preview device');
+    if (settings.current_screen != null && !Object.hasOwn(SCREENS,settings.current_screen)) throw new Error('Invalid current screen');
     this.settings = { ...settings, ...clockSettings(settings), start_screen: settings.start_screen === 'null' ? 'tamagotchi' : settings.start_screen };
     this.state = 'fresh';
     this.updatedAt = now;
@@ -33,7 +34,8 @@ export class PreviewSettings {
     }
   }
 
+  get screen() { return this.settings.current_screen || this.settings.start_screen; }
   get theme() { return THEMES[this.settings.theme] || 'red'; }
-  get screenTitle() { return SCREENS[this.settings.start_screen] || 'Неизвестный экран'; }
+  get screenTitle() { return SCREENS[this.screen] || 'Неизвестный экран'; }
   get canDisplaySettings() { return this.state !== 'loading'; }
 }

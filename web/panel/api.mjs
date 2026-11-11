@@ -139,6 +139,9 @@ function deviceData(value, expectedId) {
 }
 
 function settingsData(value, expectedId) {
+  if (value?.current_screen != null && !['clock','weather','monitor','codex','tamagotchi','markets'].includes(value.current_screen)) {
+    throw new ApiError(502, 'protocol');
+  }
   if (!value || !Number.isInteger(value.brightness) || value.brightness < 0 || value.brightness > 100
       || value.device_id !== expectedId || typeof value.theme !== 'string' || typeof value.start_screen !== 'string') {
     throw new ApiError(502, 'protocol');

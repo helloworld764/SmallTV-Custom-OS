@@ -302,7 +302,7 @@ def test_settings_update_persists_after_app_restart_with_session(env):
         assert response.status_code == 200
         assert response.json() == {'device_id': 'alice-tv', 'brightness': 0,
                                    'theme': 'Purple', 'start_screen': 'weather',
-                                   'clock_format': '24h', 'clock_seconds': True, 'clock_style': 'classic', 'device_style': 'classic', 'clock_layout': 'regular'}
+                                   'clock_format': '24h', 'clock_seconds': True, 'clock_style': 'classic', 'device_style': 'classic', 'clock_layout': 'regular', 'current_screen': None}
 
 
 def test_clock_settings_defaults_partial_updates_and_restart(env):

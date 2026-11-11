@@ -1,5 +1,7 @@
 # Storm OS
 
+Быстрый пульт экранов и яркости в боте: [docs/device-controls.md](docs/device-controls.md).
+
 Общие стили устройства, четыре вида часов, сетевой значок и экран курсов:
 [docs/device-styles.md](docs/device-styles.md).
 

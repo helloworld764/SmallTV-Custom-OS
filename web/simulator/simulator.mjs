@@ -30,7 +30,7 @@ let forecastAttempt = 0, forecastBusy = false;
 let forecastData = null;
 let petError = 'Питомец ещё не загружен.';
 let petTimer = null;
-const petScreenIsReady = () => preview.state === 'fresh' && preview.settings.start_screen === 'tamagotchi';
+const petScreenIsReady = () => preview.state === 'fresh' && preview.screen === 'tamagotchi';
 
 function setText(id, value) {
   const element = document.querySelector(id);
@@ -64,7 +64,7 @@ async function pollPet() {
 }
 
 function drawCurrentPet() {
-  const showingPet = preview.settings.start_screen === 'tamagotchi' && Boolean(deviceId)
+  const showingPet = preview.screen === 'tamagotchi' && Boolean(deviceId)
     && preview.canDisplaySettings;
   document.querySelector('#pet-content').hidden = !showingPet;
   if (!showingPet) return;
@@ -104,26 +104,26 @@ function renderPreview() {
   const settings = preview.settings;
   renderClock(document, settings);
   document.querySelector('.display').dataset.theme = preview.theme;
-  document.querySelector('.display').dataset.screen = settings.start_screen;
+  document.querySelector('.display').dataset.screen = preview.screen;
   document.querySelector('#screen-content').style.opacity = preview.canDisplaySettings ? settings.brightness / 100 : 0;
-  const clock = settings.start_screen === 'clock';
-  document.querySelector('#weather-content').hidden = settings.start_screen !== 'weather';
-  if (settings.start_screen === 'weather') {
+  const clock = preview.screen === 'clock';
+  document.querySelector('#weather-content').hidden = preview.screen !== 'weather';
+  if (preview.screen === 'weather') {
     if (preview.state === 'signed-out' || preview.state === 'unavailable') forecastData = null;
     renderWeather(document, forecastData && preview.state !== 'fresh' ? {...forecastData,stale:true} : forecastData);
     if (preview.state === 'fresh') void pollForecast();
   }
   document.querySelector('#clock-content').hidden = !clock;
-  document.querySelector('#placeholder').hidden = clock || ['tamagotchi','markets','weather'].includes(settings.start_screen);
-  document.querySelector('#markets-content').hidden = settings.start_screen !== 'markets';
-  if (settings.start_screen === 'markets' && preview.state === 'fresh') void pollMarkets();
+  document.querySelector('#placeholder').hidden = clock || ['tamagotchi','markets','weather'].includes(preview.screen);
+  document.querySelector('#markets-content').hidden = preview.screen !== 'markets';
+  if (preview.screen === 'markets' && preview.state === 'fresh') void pollMarkets();
   document.querySelector('#screen-title').textContent = preview.screenTitle;
-  document.querySelector('.codex-symbol').hidden = settings.start_screen !== 'codex';
+  document.querySelector('.codex-symbol').hidden = preview.screen !== 'codex';
   drawCurrentPet();
   const labels = {
     standalone: 'Автономное превью часов. Откройте превью из настроек устройства, чтобы читать их с сервера.',
     loading: 'Читаем сохранённые настройки устройства…',
-    fresh: `Настройки с сервера: ${settings.theme}, яркость ${settings.brightness}%, стартовый экран «${preview.screenTitle}». Часы: ${CLOCK_STYLES[settings.clock_style] || CLOCK_STYLES.classic}, ${settings.clock_format === '12h' ? '12' : '24'} ч, ${settings.clock_seconds === false ? 'без секунд' : 'с секундами'}.`,
+    fresh: `Настройки с сервера: ${settings.theme}, яркость ${settings.brightness}%, экран «${preview.screenTitle}». Часы: ${CLOCK_STYLES[settings.clock_style] || CLOCK_STYLES.classic}, ${settings.clock_format === '12h' ? '12' : '24'} ч, ${settings.clock_seconds === false ? 'без секунд' : 'с секундами'}.`,
     stale: preview.updatedAt === null ? 'Настройки не загружены. Сервер временно недоступен.' : 'Настройки устарели: показана последняя полученная версия.',
     'signed-out': 'Для просмотра настроек войдите в панель управления. Локальные часы и проверка backend продолжают работать.',
     unavailable: 'Устройство или его настройки недоступны этому аккаунту.',
@@ -187,7 +187,7 @@ async function pollWeather() {
   weatherLastAttempt = Date.now();
   const summary = document.querySelector('#weather-summary');
   const icon = document.querySelector('#weather-icon');
-  if (preview.settings.start_screen !== 'clock') return;
+  if (preview.screen !== 'clock') return;
   try {
     const data = await api.weather();
     if (!data || typeof data.available !== 'boolean') throw new Error('Invalid weather response');
@@ -225,7 +225,7 @@ async function poll() {
     if (ok) {
       try {
         preview.apply(await api.settings(deviceId), Date.now());
-        if (preview.settings.start_screen === 'clock' && Date.now() - weatherLastAttempt >= 60_000) void pollWeather();
+        if (preview.screen === 'clock' && Date.now() - weatherLastAttempt >= 60_000) void pollWeather();
         const startedAt = performance.now();
         const page = await readNotifications(api, deviceId, notifications.cursor);
         notifications.apply(page, performance.now(), startedAt);

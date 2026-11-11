@@ -7,11 +7,11 @@ import time
 from fastapi import HTTPException
 from pydantic import ValidationError
 
-from . import weather, bot_pets, bot_devices
+from . import weather, bot_pets, bot_devices, bot_controls
 from .security import token_hash
 from .telegram import CATEGORIES, active_link, preferences, throttle, unlink
 
-MENU = {'keyboard': [[{'text': 'Мои устройства'}, {'text': 'Питомец'}],
+MENU = {'keyboard': [[{'text': 'Управление'}, {'text': 'Мои устройства'}], [{'text': 'Питомец'}],
                      [{'text': 'Настройки'}, {'text': 'Помощь'}]], 'resize_keyboard': True}
 LABELS = {'codex': 'Codex', 'connection': 'Связь устройств', 'pet': 'Питомец', 'system': 'Система'}
 
@@ -56,7 +56,7 @@ def process_update(database, settings, update, now=None):
     with database.connection() as connection:
         prior = active_link(connection, who)
         already = connection.execute('SELECT 1 FROM telegram_processed WHERE update_id=?', (update['update_id'],)).fetchone()
-        if prior and not already and (text.startswith('/city ') or (not callback_id and prior['input_mode'] == 'city' and not text.startswith('/') and text not in ('Мои устройства', 'Питомец', 'Настройки', 'Помощь'))):
+        if prior and not already and (text.startswith('/city ') or (not callback_id and prior['input_mode'] == 'city' and not text.startswith('/') and text not in ('Управление', 'Мои устройства', 'Питомец', 'Настройки', 'Помощь'))):
             prepared_user = prior['user_id']
             city = text[6:] if text.startswith('/city ') else text
             attempts = connection.execute('SELECT * FROM telegram_throttle WHERE bucket=?', (f'city:{who}',)).fetchone()
@@ -102,6 +102,10 @@ def process_update(database, settings, update, now=None):
             else:
                 reply = city_error
             markup = MENU
+        elif bot_controls.accepts(text):
+            connection.execute("UPDATE telegram_links SET input_mode='' WHERE telegram_id=?",(who,))
+            connection.execute('DELETE FROM telegram_pet_drafts WHERE telegram_id=?',(who,))
+            reply,markup=bot_controls.handle(connection,link,text,settings,now)
         elif bot_devices.is_device_input(connection, link, text, bool(callback_id)):
             connection.execute("UPDATE telegram_links SET input_mode='' WHERE telegram_id=?",(who,))
             connection.execute('DELETE FROM telegram_pet_drafts WHERE telegram_id=?',(who,))
@@ -178,4 +182,4 @@ def dispatch(connection, link, text, now):
     if text == 'unlink':
         unlink(connection, uid)
         return 'Связь отключена. Для повторного подключения получите новый код в панели.', MENU
-    return 'Storm Bot работает в личном чате. «Мои устройства» → выберите устройство → тема, яркость и стартовый экран. «Питомец» → состояние и уход. «Настройки» → город и категории уведомлений. Привязка аккаунта: код из веб-панели → /link код сюда. Настройки сохраняются на сервере; применение на физическом SmallTV пока не подтверждается. Пароль от аккаунта боту не нужен.', MENU
+    return 'Storm Bot работает в личном чате. «Управление» → быстрый пульт экранов и яркости. «Мои устройства» → настройки устройства. «Питомец» → состояние и уход. «Настройки» → город и категории уведомлений. Привязка аккаунта: код из веб-панели → /link код сюда. Настройки сохраняются на сервере; применение на физическом SmallTV пока не подтверждается. Пароль от аккаунта боту не нужен.', MENU

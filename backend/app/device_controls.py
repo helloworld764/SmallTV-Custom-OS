@@ -1,0 +1,63 @@
+"""Server-side desired display state; never a device delivery acknowledgement."""
+import json
+import time
+from typing import Annotated, Literal
+from uuid import UUID
+from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel, ConfigDict, model_validator
+from .auth import Principal, write_user
+
+router=APIRouter(prefix='/api/v1/devices',tags=['device control'])
+SCREEN_ORDER=('clock','weather','tamagotchi','markets')
+
+class ControlCommand(BaseModel):
+    model_config=ConfigDict(extra='forbid')
+    request_id: UUID
+    action: Literal['next','previous','screen','dimmer','brighter','home']
+    screen: Literal['clock','weather','tamagotchi','markets'] | None = None
+
+    @model_validator(mode='after')
+    def screen_matches_action(self):
+        if (self.action=='screen') != (self.screen is not None):
+            raise ValueError('A screen is required only for screen actions')
+        return self
+
+def effective_screen(settings):
+    value=settings['current_screen'] or settings['start_screen']
+    return 'tamagotchi' if value=='null' else value
+
+def apply_control(connection,device_id,command,user_id,role='user',now=None):
+    now=int(time.time()) if now is None else now
+    row=connection.execute('''SELECT device_settings.* FROM device_settings JOIN devices ON devices.id=device_settings.device_id
+        WHERE devices.id=? AND (owner_id=? OR ?='super_admin')''',(device_id,user_id,role)).fetchone()
+    if row is None: raise HTTPException(404,'Device settings not found')
+    settings=dict(row)
+    fingerprint=json.dumps({'device_id':device_id,'action':command.action,'screen':command.screen},sort_keys=True)
+    connection.execute('DELETE FROM device_control_requests WHERE created_at<?',(now-86400,))
+    old=connection.execute('SELECT * FROM device_control_requests WHERE actor_id=? AND request_id=?',
+                           (user_id,str(command.request_id))).fetchone()
+    if old:
+        if old['fingerprint']!=fingerprint: raise HTTPException(409,'Request identifier already used for another command')
+        return {**json.loads(old['result']),'replayed':True}
+    action=command.action
+    if action in ('next','previous'):
+        active=effective_screen(settings)
+        index=SCREEN_ORDER.index(active) if active in SCREEN_ORDER else (-1 if action=='next' else 0)
+        settings['current_screen']=SCREEN_ORDER[(index+(1 if action=='next' else -1))%len(SCREEN_ORDER)]
+    elif action=='screen':settings['current_screen']=command.screen
+    elif action=='home':settings['current_screen']=None
+    elif action=='dimmer':settings['brightness']=max(0,settings['brightness']-10)
+    elif action=='brighter':settings['brightness']=min(100,settings['brightness']+10)
+    connection.execute('UPDATE device_settings SET current_screen=?,brightness=? WHERE device_id=?',
+                       (settings['current_screen'],settings['brightness'],device_id))
+    settings['clock_seconds']=bool(settings['clock_seconds'])
+    result={'device_id':device_id,'settings':settings,'replayed':False,'saved_on_server':True}
+    connection.execute('INSERT INTO device_control_requests VALUES (?,?,?,?,?,?)',
+                       (user_id,str(command.request_id),device_id,fingerprint,json.dumps(result),now))
+    connection.execute("INSERT INTO audit_log(actor_id,action,resource_id) VALUES (?,'device.control.updated',?)",(user_id,device_id))
+    return result
+
+@router.post('/{device_id}/control')
+def control(device_id:str,payload:ControlCommand,request:Request,principal:Annotated[Principal,Depends(write_user)]):
+    with request.app.state.database.transaction() as connection:
+        return apply_control(connection,device_id,payload,principal.user.id,principal.user.role)

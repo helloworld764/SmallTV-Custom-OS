@@ -6,6 +6,20 @@ import { Notifications, readNotifications } from '../web/simulator/notifications
 import { CLOCK_DEFAULTS, CLOCK_STYLES, formatClock } from '../web/shared/clock.mjs';
 import { renderClock } from '../web/simulator/clock-render.mjs';
 
+test('quick control changes active screen independently and home follows startup setting', () => {
+  const preview = new PreviewSettings('tv');
+  preview.apply({device_id:'tv',start_screen:'clock',current_screen:'weather'},1000);
+  assert.equal(preview.screen,'weather');
+  assert.equal(preview.settings.start_screen,'clock');
+  assert.equal(preview.screenTitle,'Погода');
+  preview.fail();
+  assert.equal(preview.screen,'weather');
+  preview.apply({device_id:'tv',start_screen:'tamagotchi',current_screen:null},2000);
+  assert.equal(preview.screen,'tamagotchi');
+  preview.fail(401);
+  assert.equal(preview.screen,'clock');
+});
+
 test('device style is independent of stacked and analog clock faces', () => {
   const hands = Object.fromEntries(['hour','minute','second'].map(name => ['.'+name,{style:{}}]));
   const analog = { querySelector: key => hands[key], setAttribute() {} };

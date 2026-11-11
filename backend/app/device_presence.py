@@ -49,15 +49,17 @@ def heartbeat(device_id: str, payload: HeartbeatRequest, request: Request,
 def presence(device_id: str, request: Request, principal: Annotated[Principal, Depends(current_user)]):
     with request.app.state.database.connection() as connection:
         owned_device(connection, device_id, principal)
-        row = connection.execute('''SELECT device_presence.last_seen_at,
+        return presence_values(connection, device_id, request.app.state.settings, now())
+
+
+def presence_values(connection, device_id, settings, checked_at):
+    row = connection.execute('''SELECT device_presence.last_seen_at,
             device_credentials.device_id AS credential_id, device_credentials.revoked_at,
             local_accounts.is_active FROM devices
             LEFT JOIN device_credentials ON device_credentials.device_id = devices.id
             LEFT JOIN local_accounts ON local_accounts.user_id = devices.owner_id
             LEFT JOIN device_presence ON device_presence.device_id = devices.id
             WHERE devices.id = ?''', (device_id,)).fetchone()
-    checked_at = now()
-    settings = request.app.state.settings
     last_seen = row['last_seen_at']
     if row['credential_id'] is not None and (row['revoked_at'] is not None or not row['is_active']):
         state = 'OFFLINE'

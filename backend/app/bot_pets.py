@@ -48,7 +48,7 @@ def photo_path(key):
 def is_pet_input(connection, link, text, callback):
     if text in ('Питомец','/pet','pet','pet-create','pet-cancel') or text.startswith(('petkind:','pact:','pconfirm:')):
         return True
-    return (not callback and not text.startswith('/') and text not in ('Мои устройства','Настройки','Помощь')
+    return (not callback and not text.startswith('/') and text not in ('Управление','Мои устройства','Настройки','Помощь')
             and connection.execute('SELECT 1 FROM telegram_pet_drafts WHERE telegram_id=? AND user_id=?',
                                    (link['telegram_id'],link['user_id'])).fetchone() is not None)
 
