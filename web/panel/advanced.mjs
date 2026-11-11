@@ -5,6 +5,8 @@ export class AdvancedEditor {
   constructor(form,onInput) {
     this.form=form;this.onInput=onInput;this.palettes=[];
     const root=document.createElement('div');root.id='advanced-editor';this.root=root;
+    const title=document.createElement('h3');title.id='advanced-settings-title';title.textContent='Расширенные настройки';root.append(title);
+    root.setAttribute('role','region');root.setAttribute('aria-labelledby',title.id);
     form.querySelector('#dirty-note').before(root);
     const group=(title)=>{const d=document.createElement('details');d.className='advanced-group';d.innerHTML=`<summary>${title}</summary>`;root.append(d);return d;};
     const field=(parent,key,label,type='checkbox',values=null)=>{
