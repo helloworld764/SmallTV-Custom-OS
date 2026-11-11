@@ -150,7 +150,10 @@ def save_settings(connection,device_id,payload,user_id,role='user'):
     if allowed is None:
         raise HTTPException(404,'Device settings not found')
     if 'advanced' in changes:
-        changes['advanced']=json.dumps(payload.advanced.model_dump())
+        wallpaper=payload.advanced.wallpaper_id
+        if wallpaper is not None and connection.execute('SELECT 1 FROM device_wallpapers WHERE id=? AND device_id=?',(str(wallpaper),device_id)).fetchone() is None:
+            raise HTTPException(404,'Wallpaper not found for this device')
+        changes['advanced']=json.dumps(payload.advanced.model_dump(mode='json'))
         changes['screen_changed_at']=int(time.time())
     elif 'theme' in changes:
         current=json.loads(connection.execute('SELECT advanced FROM device_settings WHERE device_id=?',(device_id,)).fetchone()[0])

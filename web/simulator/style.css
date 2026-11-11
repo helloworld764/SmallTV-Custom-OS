@@ -173,6 +173,7 @@ summary { cursor: pointer; }
 .display[data-backdrop=gradient] { background-image:linear-gradient(135deg,color-mix(in srgb,var(--screen-accent) 25%,var(--screen-bg)),var(--screen-bg) 70%); }
 .display[data-backdrop=grid] { background-image:linear-gradient(color-mix(in srgb,var(--screen-accent) 12%,transparent) 1px,transparent 1px),linear-gradient(90deg,color-mix(in srgb,var(--screen-accent) 12%,transparent) 1px,transparent 1px); background-size:16px 16px; }
 .display[data-backdrop=stars] { background-image:radial-gradient(circle at 15% 12%,var(--screen-accent) 0 1px,transparent 1.5px),radial-gradient(circle at 70% 40%,var(--screen-text) 0 1px,transparent 1.5px),radial-gradient(circle at 40% 85%,var(--screen-text) 0 .7px,transparent 1px); background-size:83px 97px,111px 131px,67px 79px; }
+.display[data-backdrop=wallpaper] { background-image:linear-gradient(color-mix(in srgb,var(--screen-bg) 65%,transparent),color-mix(in srgb,var(--screen-bg) 65%,transparent)),var(--wallpaper,none); background-size:cover; background-position:center; }
 .display[data-pet-motion=off] #pet-art { animation:none; }
 .display[data-pet-motion=reduced] #pet-art { animation:pet-quiet 20s ease-in-out infinite; }
 @keyframes pet-quiet { 50% { transform:translateY(-.5px); } }

@@ -1,9 +1,12 @@
-export const DISPLAY_DEFAULTS=Object.freeze({custom_colors:false,background:'#080809',text:'#f4f4f6',accent:'#ff5264',palettes:[],backdrop:'solid',screens:['clock','weather','tamagotchi','markets','codex'],auto_rotate:false,rotate_seconds:30,night_enabled:false,night_start:'22:00',night_end:'08:00',night_brightness:20,timezone:'local',date_format:'long',weekday:true,day_progress:true,notification_seconds:4,quiet_enabled:false,quiet_start:'23:00',quiet_end:'08:00',pet_phrases:true,pet_motion:'normal'});
+export const DISPLAY_DEFAULTS=Object.freeze({custom_colors:false,background:'#080809',text:'#f4f4f6',accent:'#ff5264',palettes:[],backdrop:'solid',wallpaper_id:null,screens:['clock','weather','tamagotchi','markets','codex'],auto_rotate:false,rotate_seconds:30,night_enabled:false,night_start:'22:00',night_end:'08:00',night_brightness:20,timezone:'local',date_format:'long',weekday:true,day_progress:true,notification_seconds:4,quiet_enabled:false,quiet_start:'23:00',quiet_end:'08:00',pet_phrases:true,pet_motion:'normal'});
 export const ZONES=['local','UTC','Europe/Moscow','Europe/London','Europe/Berlin','Asia/Dubai','Asia/Tokyo','America/New_York'];
 export function displayOptions(value={}) {
   const o={...structuredClone(DISPLAY_DEFAULTS),...value};
+  o.wallpaper_id=value.wallpaper_id??null;
+  if(o.wallpaper_id!==null&&(typeof o.wallpaper_id!=='string'||! /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(o.wallpaper_id)))throw new Error('Invalid wallpaper');
+  if(o.backdrop==='wallpaper'&&!o.wallpaper_id)throw new Error('Choose a wallpaper');
   const color=v=>typeof v==='string'&&/^#[0-9a-f]{6}$/i.test(v);
-  if(![o.background,o.text,o.accent].every(color)||!ZONES.includes(o.timezone)||!['solid','gradient','grid','stars'].includes(o.backdrop)||!['long','short','iso'].includes(o.date_format)||!['normal','reduced','off'].includes(o.pet_motion))throw new Error('Invalid display options');
+  if(![o.background,o.text,o.accent].every(color)||!ZONES.includes(o.timezone)||!['solid','gradient','grid','stars','wallpaper'].includes(o.backdrop)||!['long','short','iso'].includes(o.date_format)||!['normal','reduced','off'].includes(o.pet_motion))throw new Error('Invalid display options');
   for(const key of ['custom_colors','auto_rotate','night_enabled','weekday','day_progress','quiet_enabled','pet_phrases'])if(typeof o[key]!=='boolean')throw new Error('Invalid toggle');
   for(const [key,min,max] of [['rotate_seconds',10,600],['night_brightness',0,100],['notification_seconds',2,10]])if(!Number.isInteger(o[key])||o[key]<min||o[key]>max)throw new Error('Invalid range');
   for(const key of ['night_start','night_end','quiet_start','quiet_end'])if(!/^(?:[01][0-9]|2[0-3]):[0-5][0-9]$/.test(o[key]))throw new Error('Invalid time');

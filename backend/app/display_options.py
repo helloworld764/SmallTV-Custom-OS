@@ -2,6 +2,7 @@
 import json
 import time
 from typing import Annotated, Literal
+from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 Color=Annotated[str,Field(pattern=r'^#[0-9a-fA-F]{6}$')]
@@ -23,7 +24,8 @@ class DisplayOptions(BaseModel):
     text:Color='#f4f4f6'
     accent:Color='#ff5264'
     palettes:list[Palette]=Field(default_factory=list,max_length=8)
-    backdrop:Literal['solid','gradient','grid','stars']='solid'
+    backdrop:Literal['solid','gradient','grid','stars','wallpaper']='solid'
+    wallpaper_id:UUID|None=None
     screens:list[ScreenName]=Field(default_factory=lambda:['clock','weather','tamagotchi','markets','codex'],min_length=1,max_length=5)
     auto_rotate:bool=Field(default=False,strict=True)
     rotate_seconds:int=Field(default=30,ge=10,le=600,strict=True)
@@ -44,6 +46,7 @@ class DisplayOptions(BaseModel):
 
     @model_validator(mode='after')
     def no_duplicates(self):
+        if self.backdrop=='wallpaper' and self.wallpaper_id is None:raise ValueError('Choose a wallpaper')
         if len(set(self.screens))!=len(self.screens):raise ValueError('Duplicate screens')
         if len({p.name.casefold() for p in self.palettes})!=len(self.palettes):raise ValueError('Duplicate palette names')
         if self.night_enabled and self.night_start==self.night_end:raise ValueError('Night schedule must have different endpoints')

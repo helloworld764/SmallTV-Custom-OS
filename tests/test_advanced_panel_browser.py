@@ -27,7 +27,7 @@ def test_advanced_panel_palette_preview_save_and_remote(tmp_path,monkeypatch,wid
     script=r'''
 const errors=[];window.addEventListener('error',e=>errors.push(e.message));window.addEventListener('unhandledrejection',e=>errors.push(String(e.reason)));
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
-const wait=async fn=>{for(let i=0;i<400;i++){if(fn())return;await pause(50);}throw new Error('QA wait timeout');};
+let step='login';const wait=async fn=>{for(let i=0;i<400;i++){if(fn())return;await pause(50);}const doc=document.querySelector('iframe')?.contentDocument;throw new Error('QA wait timeout: '+step+'; '+document.querySelector('.wallpaper-editor [role="status"]')?.textContent+'; '+document.querySelector('#save-result')?.textContent+'; frame '+doc?.querySelector('#preview-status')?.textContent+'; '+doc?.querySelector('#draft-label')?.textContent+'; '+doc?.querySelector('.display')?.outerHTML.slice(0,800));};
 const input=(selector,value)=>{const n=document.querySelector(selector);if(!n)throw new Error('Missing '+selector);if(n.type==='checkbox')n.checked=value;else n.value=value;n.dispatchEvent(new Event('input',{bubbles:true}));};
 const check=(value,label)=>{if(!value)throw new Error(label);};
 (async()=>{
@@ -59,6 +59,37 @@ const check=(value,label)=>{if(!value)throw new Error(label);};
  document.querySelector('[data-control="next"]').click();
  await wait(()=>document.querySelector('#web-remote-status').textContent.includes('Команда сохранена'));
  settings=await(await fetch('/api/v1/devices/qa-tv/settings')).json();check(settings.current_screen==='weather','Web remote not applied');
+ // Upload a synthetic local image: no original file or user data is used.
+ step='wallpaper upload';
+ const canvas=document.createElement('canvas');canvas.width=400;canvas.height=300;
+ const ctx=canvas.getContext('2d');ctx.fillStyle='#283d77';ctx.fillRect(0,0,400,300);ctx.fillStyle='#56c6ff';ctx.fillRect(120,80,100,100);
+ const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
+ const transfer=new DataTransfer();transfer.items.add(new File([blob],'qa.png',{type:'image/png'}));
+ document.querySelector('input[aria-label="Файл обоев"]').files=transfer.files;
+ input('input[aria-label="Название обоев"]','Мой фон');
+ const mediaButton=text=>[...document.querySelectorAll('.wallpaper-editor button')].find(n=>n.textContent===text);
+ mediaButton('Загрузить обои').click();
+ await wait(()=>document.querySelector('.wallpaper-editor [role="status"]').textContent.includes('Обои загружены'));
+ step='wallpaper preview';
+ await wait(()=>frame.contentDocument.querySelector('.display').style.getPropertyValue('--wallpaper').includes('blob:'));
+ settings=await(await fetch('/api/v1/devices/qa-tv/settings')).json();check(settings.advanced.backdrop==='stars','Upload activated wallpaper before save');
+ check(document.querySelector('#dirty-note').hidden===false,'Uploaded selection must be a draft');
+ for(const style of ['classic','minimal','terminal','orbit']){
+   input('#device-style',style);await pause(80);
+   check(frame.contentDocument.querySelector('.display').dataset.backdrop==='wallpaper','Wallpaper missing for '+style);
+   check(frame.contentWindow.getComputedStyle(frame.contentDocument.querySelector('.display')).backgroundImage.includes('blob:'),'Image not rendered for '+style);
+ }
+ step='wallpaper save';document.querySelector('#save-result').textContent='';document.querySelector('#settings-form').requestSubmit();
+ await wait(()=>document.querySelector('#save-result').textContent.includes('сохранены'));
+ settings=await(await fetch('/api/v1/devices/qa-tv/settings')).json();check(settings.advanced.backdrop==='wallpaper'&&settings.advanced.wallpaper_id,'Wallpaper reference not saved');
+ await wait(()=>document.querySelector('select[aria-label="Мои обои"]').value===settings.advanced.wallpaper_id);
+ step='active delete';window.confirm=()=>true;mediaButton('Удалить выбранные обои').click();
+ await wait(()=>document.querySelector('.wallpaper-editor [role="status"]').textContent.includes('используются'));
+ step='save other background';input('[data-advanced="backdrop"]','grid');document.querySelector('#save-result').textContent='';document.querySelector('#settings-form').requestSubmit();
+ await wait(()=>document.querySelector('#save-result').textContent.includes('сохранены'));
+ await wait(()=>document.querySelector('select[aria-label="Мои обои"]').value===settings.advanced.wallpaper_id);
+ step='delete unused';mediaButton('Удалить выбранные обои').click();await wait(()=>document.querySelector('.wallpaper-editor [role="status"]').textContent.includes('Обои удалены'));
+ check((await(await fetch('/api/v1/devices/qa-tv/wallpapers')).json()).length===0,'Delete did not remove wallpaper');
  check(errors.length===0,'Browser errors: '+errors.join(';'));
  document.querySelectorAll('.advanced-group').forEach(n=>n.open=false);
  document.querySelector('.advanced-group').open=true;
@@ -71,12 +102,15 @@ const check=(value,label)=>{if(!value)throw new Error(label);};
  document.querySelector('#qa-report').textContent=JSON.stringify({ok:true,errors,markup:document.querySelector('#advanced-editor').outerHTML,rect:document.querySelector('#advanced-editor').getBoundingClientRect().toJSON(),scrollY});
 })().catch(error=>{document.querySelector('#qa-report').textContent=JSON.stringify({ok:false,error:String(error),errors});});
 '''.replace('PASSWORD',json.dumps(password))
+    media_requests=[]
     @app.middleware('http')
     async def instrument(request,call_next):
         if request.url.path=='/panel/':
             page=(ROOT/'web/panel/index.html').read_text(encoding='utf-8')
             return HTMLResponse(page.replace('</body>','<pre id="qa-report"></pre><script>'+script+'</script></body>'))
-        return await call_next(request)
+        response=await call_next(request)
+        if '/wallpapers' in request.url.path:media_requests.append((request.method,request.url.path,response.status_code,response.headers.get('content-type')))
+        return response
     sock=socket.socket();sock.bind(('127.0.0.1',0));port=sock.getsockname()[1]
     server=uvicorn.Server(uvicorn.Config(app,log_level='error',lifespan='on'))
     thread=threading.Thread(target=lambda:server.run(sockets=[sock]),daemon=True);thread.start()
@@ -89,7 +123,7 @@ const check=(value,label)=>{if(!value)throw new Error(label);};
             result=subprocess.run([chrome,'--headless=new','--no-first-run','--disable-background-networking','--disable-component-update','--disable-extensions','--disable-features=PaintHolding','--run-all-compositor-stages-before-draw','--hide-scrollbars',f'--window-size={width},1000','--virtual-time-budget=40000','--user-data-dir='+str(Path(work)/'profile'),'--screenshot='+str(tmp_path/'advanced-panel.png'),'--dump-dom',f'http://127.0.0.1:{port}/panel/'],capture_output=True,text=True,encoding='utf-8',errors='replace',timeout=90,**({'creationflags':subprocess.CREATE_NO_WINDOW} if os.name=='nt' else {}))
             match=re.search(r'<pre id="qa-report">([^<]+)</pre>',result.stdout)
             assert match,'Browser report missing'
-            report=json.loads(html.unescape(match[1]));(tmp_path/'panel-report.json').write_text(json.dumps(report),encoding='utf-8');assert report.get('ok'),report
+            report=json.loads(html.unescape(match[1]));(tmp_path/'panel-report.json').write_text(json.dumps(report),encoding='utf-8');assert report.get('ok'),(report,media_requests)
             # Static component image avoids Chrome's blank CLI capture after a live-page scroll.
             css=(ROOT/'web/panel/style.css').read_text(encoding='utf-8')+(ROOT/'web/shared/site-theme.css').read_text(encoding='utf-8')
             page=Path(work)/'component.html';page.write_text('<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>'+css+f'body{{padding:16px;width:{min(width,760)}px;margin:0}}</style>'+report['markup'],encoding='utf-8')

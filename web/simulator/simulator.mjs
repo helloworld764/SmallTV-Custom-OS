@@ -1,4 +1,5 @@
 import {CodexScreen,renderCodex} from './codex-screen.mjs';
+import {Wallpaper} from './wallpaper.mjs';
 import {applyOptions} from './options-render.mjs';
 import {displayOptions,withinSchedule} from '../shared/display-options.mjs';
 import { Connection, checkHealth } from './connection.mjs';
@@ -11,6 +12,8 @@ import { Notifications, readNotifications } from './notifications.mjs';
 import { drawPetFrame, petPresentation, PET_SHEETS } from './pet-display.mjs';
 
 const connection = new Connection();
+const wallpaper=new Wallpaper(document.querySelector('.display'));
+window.addEventListener('pagehide',()=>wallpaper.clear());
 const embedded=new URLSearchParams(location.search).get('embedded')==='1' && window.parent!==window;
 let draftOptions=null,draftBasic={};
 const liveSettings=()=>({...preview.settings,...draftBasic,brightness:preview.canDisplaySettings?(draftBasic.brightness??preview.settings.brightness):0,advanced:draftOptions||preview.settings.advanced||{}});
@@ -112,6 +115,7 @@ function renderPreview() {
   const settings = preview.settings;
   renderClock(document, liveSettings());
   const options=applyOptions(document,liveSettings());
+  void wallpaper.sync(deviceId,options.wallpaper_id,options.backdrop==='wallpaper'&&['fresh','stale'].includes(preview.state));
   notifications.duration=options.notification_seconds*1000;
   notifications.quiet=options.quiet_enabled&&withinSchedule(new Date(),options.timezone,options.quiet_start,options.quiet_end);
   document.querySelector('.display').dataset.theme = THEMES[liveSettings().theme]||preview.theme;

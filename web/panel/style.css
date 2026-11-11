@@ -100,3 +100,6 @@ html[data-site-theme=light] #device-presence[data-state=STALE], html[data-site-t
 .web-remote { margin-top:16px; }
 .advanced-group .advanced-checkbox { display:flex; align-items:center; gap:8px; }
 .advanced-group .advanced-checkbox input { display:inline-block; width:18px; height:18px; min-height:18px; padding:0; margin:0; flex:none; }
+.wallpaper-editor { min-width:0; margin-top:16px; padding:12px; border:1px solid var(--border); border-radius:10px; }
+.wallpaper-editor legend { padding:0 6px; font-weight:650; }
+.wallpaper-editor input, .wallpaper-editor select { margin-bottom:8px; }

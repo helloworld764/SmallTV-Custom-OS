@@ -6,7 +6,7 @@ import { DevicePresence, presenceText } from './device-presence.mjs';
 const $ = selector => document.querySelector(selector);
 const state = { session: null, devices: [], selected: null, settings: null, busy: false, more: false, loaded: 0, presence: null };
 let telegramCodeTimer;
-const advancedEditor=new AdvancedEditor($('#settings-form'));
+const advancedEditor=new AdvancedEditor($('#settings-form'),()=>state.session);
 
 function clearTelegramCode() {
   clearTimeout(telegramCodeTimer);
@@ -116,6 +116,7 @@ function nameDirty() {
 function dirty() { return settingsDirty() || nameDirty(); }
 
 function clearDeviceDetails() {
+  advancedEditor.wallpapers.clear();
   state.presence = null;
   $('#device-details').hidden = true;
   $('#device-name').value = '';

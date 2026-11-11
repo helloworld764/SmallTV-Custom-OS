@@ -216,7 +216,7 @@ def device_state(device_id: str, request: Request, identity: Annotated[str, Depe
     values = dict(settings)
     values['clock_seconds'] = bool(values['clock_seconds'])
     from .display_options import options
-    values['advanced'] = options(values['advanced']).model_dump(exclude_unset=True)
+    values['advanced'] = options(values['advanced']).model_dump(exclude_unset=True,mode='json')
     return {'device_id': identity, 'settings': values}
 
 
