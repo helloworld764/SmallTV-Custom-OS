@@ -1,5 +1,6 @@
 import { Connection, checkHealth } from './connection.mjs';
 import { CLOCK_STYLES } from '../shared/clock.mjs';
+import { renderWeather } from './weather-render.mjs';
 import { renderClock } from './clock-render.mjs';
 import { ApiClient } from '../panel/api.mjs';
 import { PreviewSettings, THEMES } from './preview.mjs';
@@ -25,6 +26,8 @@ const petImages = new Map();
 let currentPet = null;
 let marketAttempt = 0, marketBusy = false;
 let weatherLastAttempt = 0;
+let forecastAttempt = 0, forecastBusy = false;
+let forecastData = null;
 let petError = 'Питомец ещё не загружен.';
 let petTimer = null;
 const petScreenIsReady = () => preview.state === 'fresh' && preview.settings.start_screen === 'tamagotchi';
@@ -104,8 +107,14 @@ function renderPreview() {
   document.querySelector('.display').dataset.screen = settings.start_screen;
   document.querySelector('#screen-content').style.opacity = preview.canDisplaySettings ? settings.brightness / 100 : 0;
   const clock = settings.start_screen === 'clock';
+  document.querySelector('#weather-content').hidden = settings.start_screen !== 'weather';
+  if (settings.start_screen === 'weather') {
+    if (preview.state === 'signed-out' || preview.state === 'unavailable') forecastData = null;
+    renderWeather(document, forecastData && preview.state !== 'fresh' ? {...forecastData,stale:true} : forecastData);
+    if (preview.state === 'fresh') void pollForecast();
+  }
   document.querySelector('#clock-content').hidden = !clock;
-  document.querySelector('#placeholder').hidden = clock || ['tamagotchi','markets'].includes(settings.start_screen);
+  document.querySelector('#placeholder').hidden = clock || ['tamagotchi','markets','weather'].includes(settings.start_screen);
   document.querySelector('#markets-content').hidden = settings.start_screen !== 'markets';
   if (settings.start_screen === 'markets' && preview.state === 'fresh') void pollMarkets();
   document.querySelector('#screen-title').textContent = preview.screenTitle;
@@ -156,6 +165,22 @@ async function pollMarkets() {
     document.querySelector('#market-rows').replaceChildren();
     document.querySelector('#market-status').textContent = 'Курсы временно недоступны';
   } finally { clearTimeout(timer); marketBusy = false; }
+}
+
+async function pollForecast() {
+  if (forecastBusy || Date.now() - forecastAttempt < 60_000) return;
+  forecastAttempt = Date.now(); forecastBusy = true;
+  const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), 6500);
+  try {
+    const response = await fetch('/api/v1/weather/forecast', {signal:controller.signal,cache:'no-store'});
+    if (!response.ok) throw new Error('Weather unavailable');
+    forecastData = await response.json();
+    renderWeather(document, forecastData);
+  } catch {
+    // Preserve only explicitly stale cached data; a lost request is never fresh.
+    if (forecastData?.available) forecastData = {...forecastData,stale:true};
+    renderWeather(document, forecastData);
+  } finally { clearTimeout(timer); forecastBusy = false; }
 }
 
 async function pollWeather() {

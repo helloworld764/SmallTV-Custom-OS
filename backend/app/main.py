@@ -25,6 +25,7 @@ from .pets import router as pets_router
 from .weather import router as weather_router
 from .telegram import router as telegram_router
 from .markets import router as markets_router
+from .weather_forecast import router as forecast_router
 
 
 class Health(BaseModel):
@@ -86,6 +87,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(weather_router)
     app.include_router(telegram_router)
     app.include_router(markets_router)
+    app.include_router(forecast_router)
 
     @app.get("/health", response_model=Health)
     def health(response: Response) -> Health:

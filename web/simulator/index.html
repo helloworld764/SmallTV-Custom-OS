@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Storm Simulator</title>
-  <link rel="stylesheet" href="style.css?v=device-scenes-4">
+  <link rel="stylesheet" href="style.css?v=weather-screen-5">
   <link rel="stylesheet" href="/shared/site-theme.css">
   <script type="module" src="/shared/site-theme.mjs"></script>
 </head>
@@ -27,6 +27,17 @@
             <div id="weather" aria-live="polite"><span id="weather-icon">&#xB7;</span><span id="weather-summary">&#x41F;&#x43E;&#x433;&#x43E;&#x434;&#x430; &#x437;&#x430;&#x433;&#x440;&#x443;&#x436;&#x430;&#x435;&#x442;&#x441;&#x44F;</span></div>
             <div class="clock-day-track" aria-hidden="true"><span></span></div>
             <div class="terminal-foot" aria-hidden="true"><span>LOCAL CLOCK</span><span>БРАУЗЕР</span></div>
+          </div>
+          <div id="weather-content" hidden>
+            <div class="wx-city"><span id="wx-city">Погода</span><span>СЕГОДНЯ</span></div>
+            <div id="wx-error">Загружаем погоду…</div>
+            <div id="wx-details" hidden>
+              <div class="wx-hero"><div id="wx-art"></div><div><strong id="wx-temp"></strong><div id="wx-condition"></div></div></div>
+              <div class="wx-metrics"><div><span>Ощущается</span><strong id="wx-feels"></strong></div><div><span>Ветер</span><strong id="wx-wind"></strong></div><div><span>Мин / макс</span><strong id="wx-range"></strong></div></div>
+              <div class="wx-solar"><span>↗ Восход <b id="wx-sunrise"></b></span><span>↘ Закат <b id="wx-sunset"></b></span></div>
+              <div class="wx-next"><strong>ЗАВТРА</strong><p id="wx-tomorrow"></p></div>
+              <div id="wx-freshness"></div>
+            </div>
           </div>
           <div id="markets-content" class="screen-card" hidden><div class="market-heading">MARKET WATCH <span>₿</span></div><div id="market-rows"></div><div id="market-status">Загрузка курсов…</div><div class="market-source">CoinGecko · ЦБ РФ</div></div>
           <div id="placeholder" class="screen-card" hidden><svg class="codex-symbol" viewBox="0 0 48 48" aria-hidden="true"><rect x="6" y="12" width="36" height="28" rx="9"/><path d="M24 12V5m-4 0h8M12 22l6 4-6 4m12 0h10M2 22v10m44-10v10"/></svg><strong id="screen-title"></strong><p>Экран ещё не подключён</p></div>
@@ -53,6 +64,6 @@
          Запустите backend снова: страница восстановит связь автоматически.</p>
     </details>
   </main>
-  <script type="module" src="simulator.mjs?v=device-scenes-4"></script>
+  <script type="module" src="simulator.mjs?v=weather-screen-5"></script>
 </body>
 </html>

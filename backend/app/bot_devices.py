@@ -9,7 +9,7 @@ from pydantic import ValidationError
 from .devices import SettingsPatch, save_settings
 
 THEMES={'BlackArch Red':'Красно-чёрная','Dark Blue':'Синяя','Purple':'Фиолетовая','Light':'Светлая'}
-SCREENS={'clock':'Часы','tamagotchi':'Tamagotchi','weather':'Погода — заглушка','monitor':'Debian Monitor — заглушка',
+SCREENS={'clock':'Часы','tamagotchi':'Tamagotchi','weather':'Погода','monitor':'Debian Monitor — заглушка',
          'markets':'Курсы валют','codex':'Codex — заглушка'}
 TOP_LEVEL=('Мои устройства','Питомец','Настройки','Помощь')
 CLOCK_FORMATS={'24h':'24 часа','12h':'12 часов (AM/PM)'}
