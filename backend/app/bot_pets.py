@@ -46,8 +46,9 @@ def photo_path(key):
 
 
 def is_pet_input(connection, link, text, callback):
-    if text in ('Питомец','/pet','pet','pet-create','pet-cancel') or text.startswith(('petkind:','pact:','pconfirm:')):
+    if text in ('Питомец','/pet','pet','pet-create','pet-cancel','pet-upload') or text.startswith(('petkind:','pact:','pconfirm:','pcustom-')):
         return True
+    if not callback and not text.startswith('/') and text not in ('Управление','Мои устройства','Настройки','Помощь') and connection.execute('SELECT 1 FROM telegram_custom_pet_inputs WHERE telegram_id=? AND user_id=?',(link['telegram_id'],link['user_id'])).fetchone():return True
     return (not callback and not text.startswith('/') and text not in ('Управление','Мои устройства','Настройки','Помощь')
             and connection.execute('SELECT 1 FROM telegram_pet_drafts WHERE telegram_id=? AND user_id=?',
                                    (link['telegram_id'],link['user_id'])).fetchone() is not None)
@@ -68,9 +69,10 @@ def card(connection, uid, now, prefix=''):
     try:
         row = pets.find_pet(connection,uid)
     except HTTPException:
-        return 'Питомца ещё нет. Выберите одного из трёх базовых персонажей и придумайте имя.', keyboard([[('Создать питомца','pet-create')]])
+        return 'Питомца ещё нет. Выберите базового персонажа или загрузите своего и придумайте имя.', keyboard([[('Создать питомца','pet-create')],[('Создать своего','pcustom-start')]])
     pet = pets.view(row,now)
-    text = f'{pet.name} · {pet.kind}\nСытость: {pet.satiety:.0f}/100\nЭнергия: {pet.energy:.0f}/100\nНастроение: {pet.mood:.0f}/100\n'
+    appearance='Свой питомец' if pet.image_id else pet.kind
+    text = f'{pet.name} · {appearance}\nСытость: {pet.satiety:.0f}/100\nЭнергия: {pet.energy:.0f}/100\nНастроение: {pet.mood:.0f}/100\n'
     rows = []
     if pet.lifecycle == 'ACTIVE':
         text += EMOTION_TEXT[pet.emotion]
@@ -87,13 +89,20 @@ def card(connection, uid, now, prefix=''):
         rows = [[('Вернуть',new_intent(connection,row,'return',now))]]
     else:
         text += 'Время сервера не согласуется с сохранённым состоянием. Действия временно недоступны.'
-    rows += [[('Обновить','pet')]]
+    rows += [[('Обновить','pet')],[('Свой образ и имя','pcustom-start')]]
     state = REACTIONS.get(pet.reaction.kind) if pet.reaction else EMOTIONS[pet.emotion]
-    return (prefix+'\n\n' if prefix else '')+text, keyboard(rows,f'{pet.kind}-{state}')
+    if pet.image_id and pet.lifecycle=='ACTIVE':text+='\n'+({'eating':'🍽 Вкусно!','playing':'✨ Играем!','sleeping':'💤 Спит','waking':'☀ Проснулся!','happy':'♥ Рад встрече!','hungry_sad':'Хочется заботы','tired':'Пора отдохнуть'}.get(state,''))
+    return (prefix+'\n\n' if prefix else '')+text, keyboard(rows,'custom:'+pet.image_id if pet.image_id else f'{pet.kind}-{state}')
 
 
-def handle(connection, link, text, now, callback=False):
+def handle(connection, link, text, now, callback=False,prepared_image=None):
     uid,who = link['user_id'],link['telegram_id']
+    if text.startswith('pcustom-') or text=='pet-upload' or (not callback and text not in ('Питомец','/pet','pet','pet-cancel') and connection.execute('SELECT 1 FROM telegram_custom_pet_inputs WHERE telegram_id=? AND user_id=?',(who,uid)).fetchone()):
+        from .bot_custom_pets import handle as custom_handle
+        return custom_handle(connection,link,text,now,callback,prepared_image)
+    if text in ('Питомец','/pet','pet','pet-cancel'):
+        connection.execute('DELETE FROM pet_image_drafts WHERE confirmed_pet_id IS NULL AND id IN (SELECT draft_id FROM telegram_custom_pet_inputs WHERE telegram_id=? AND user_id=?)',(who,uid))
+    connection.execute('DELETE FROM telegram_custom_pet_inputs WHERE telegram_id=?',(who,))
     connection.execute('DELETE FROM telegram_pet_intents WHERE expires_at<=?',(now,))
     draft = connection.execute('SELECT * FROM telegram_pet_drafts WHERE telegram_id=? AND user_id=?',(who,uid)).fetchone()
     if text in ('Питомец','/pet','pet','pet-cancel'):
@@ -105,7 +114,7 @@ def handle(connection, link, text, now, callback=False):
         if connection.execute('SELECT 1 FROM pets WHERE owner_id=?',(uid,)).fetchone():
             return card(connection,uid,now,'Питомец уже создан. Созданием нового нельзя сбросить состояние.')
         if text == 'pet-create':
-            return 'Выберите персонажа. Затем бот попросит имя.', keyboard([[(kind,'petkind:'+kind)] for kind in KINDS]+[[('Отмена','pet-cancel')]])
+            return 'Выберите персонажа. Затем бот попросит имя.', keyboard([[(kind,'petkind:'+kind)] for kind in KINDS]+[[('Создать своего','pcustom-start')],[('Отмена','pet-cancel')]])
         kind = text[8:]
         if kind not in KINDS:
             return 'Этот персонаж недоступен.', keyboard([[('К питомцу','pet')]])

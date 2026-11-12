@@ -145,6 +145,8 @@ def _snapshot(source: Path, destination: Path, migrations: Path, timeout: float,
                 connection.execute("UPDATE pet_sleep_sessions SET status='cancelled' WHERE status='pending'")
                 connection.execute('DELETE FROM telegram_pet_drafts')
                 connection.execute('DELETE FROM telegram_pet_intents')
+                connection.execute('DELETE FROM telegram_custom_pet_inputs')
+                connection.execute('DELETE FROM pet_image_drafts WHERE confirmed_pet_id IS NULL')
                 connection.execute('DELETE FROM telegram_links')
                 connection.execute('DELETE FROM telegram_link_codes')
                 connection.execute('UPDATE telegram_preferences SET enabled=0')

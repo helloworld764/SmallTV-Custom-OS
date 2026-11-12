@@ -1,5 +1,6 @@
 import {CodexScreen,renderCodex} from './codex-screen.mjs';
 import {Wallpaper} from './wallpaper.mjs';
+import {PrivatePet,drawPrivatePet,imageId} from './private-pet.mjs';
 import {applyOptions} from './options-render.mjs';
 import {displayOptions,withinSchedule} from '../shared/display-options.mjs';
 import { Connection, checkHealth } from './connection.mjs';
@@ -34,6 +35,8 @@ const eventStatus = document.querySelector('#event-status');
 const petCanvas = document.querySelector('#pet-art');
 const petContext = petCanvas.getContext('2d');
 const petImages = new Map();
+const privatePet=new PrivatePet(()=>drawCurrentPet());
+window.addEventListener('pagehide',()=>privatePet.clear());
 let currentPet = null;
 let marketAttempt = 0, marketBusy = false;
 let weatherLastAttempt = 0;
@@ -58,6 +61,7 @@ async function pollPet() {
   try {
     const pet = await api.currentPet();
     if (!pet || typeof pet.name !== 'string' || !PET_SHEETS[pet.kind]
+        || (pet.image_id!=null&&!imageId(pet.image_id))
         || !['ACTIVE', 'ABSENT', 'RETURN_AVAILABLE', 'UNKNOWN'].includes(pet.lifecycle)
         || !Number.isSafeInteger(pet.server_time)) throw new Error('Invalid pet response');
     currentPet = pet;
@@ -65,6 +69,7 @@ async function pollPet() {
     setText('#pet-preview-status', 'Состояние питомца загружено из аккаунта текущей сессии.');
   } catch (error) {
     currentPet = null;
+    privatePet.clear();
     petError = error.status === 404 ? 'Питомец ещё не создан.'
       : error.status === 401 ? 'Войдите в панель, чтобы увидеть питомца.'
         : 'Состояние питомца временно недоступно.';
@@ -78,8 +83,9 @@ function drawCurrentPet() {
   const showingPet = preview.screen === 'tamagotchi' && Boolean(deviceId)
     && preview.canDisplaySettings;
   document.querySelector('#pet-content').hidden = !showingPet;
-  if (!showingPet) return;
+  if (!showingPet) {privatePet.clear();return;}
   if (!currentPet) {
+    privatePet.clear();
     petContext.clearRect(0, 0, petCanvas.width, petCanvas.height);
     setText('#pet-name', '');
     setText('#pet-caption', petError);
@@ -90,6 +96,14 @@ function drawCurrentPet() {
   setText('#pet-caption', presentation.label);
   const ariaLabel = `Питомец ${currentPet.name}: ${presentation.label}`;
   if (petCanvas.getAttribute('aria-label') !== ariaLabel) petCanvas.setAttribute('aria-label', ariaLabel);
+  if(currentPet.image_id){
+    void privatePet.load(currentPet.image_id);
+    petContext.clearRect(0,0,petCanvas.width,petCanvas.height);
+    if(privatePet.id===currentPet.image_id&&privatePet.image)drawPrivatePet(petContext,privatePet.image,presentation.state,petCanvas.width,petCanvas.height);
+    else if(privatePet.retry>Date.now())setText('#pet-caption','Образ временно недоступен');
+    return;
+  }
+  privatePet.clear();
   let image = petImages.get(currentPet.kind);
   if (!image) {
     const kind = currentPet.kind;

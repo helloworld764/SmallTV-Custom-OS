@@ -40,12 +40,13 @@ def identity(update):
             or 'forward_origin' in message or 'forward_from' in message):
         return None
     text = callback.get('data') if isinstance(callback, dict) else message.get('text')
+    if not callback and ('photo' in message or 'document' in message):text='pet-upload'
     if not isinstance(text, str) or not 0 < len(text) <= 256:
         return None
     return who, text.strip(), callback.get('id') if isinstance(callback, dict) else None
 
 
-def process_update(database, settings, update, now=None):
+def process_update(database, settings, update, now=None,prepared_image=None):
     parsed = identity(update)
     if parsed is None:
         return None
@@ -67,7 +68,7 @@ def process_update(database, settings, update, now=None):
     with database.connection() as connection:
         prior = active_link(connection, who)
         already = connection.execute('SELECT 1 FROM telegram_processed WHERE update_id=?', (update['update_id'],)).fetchone()
-        if prior and not already and (text.startswith('/city ') or (not callback_id and prior['input_mode'] == 'city' and not text.startswith('/') and text not in ('Управление', 'Мои устройства', 'Питомец', 'Настройки', 'Помощь'))):
+        if prior and not already and (text.startswith('/city ') or (not callback_id and prior['input_mode'] == 'city' and not text.startswith('/') and text not in ('Управление', 'Мои устройства', 'Питомец', 'Настройки', 'Помощь','pet-upload'))):
             prepared_user = prior['user_id']
             city = text[6:] if text.startswith('/city ') else text
             attempts = connection.execute('SELECT * FROM telegram_throttle WHERE bucket=?', (f'city:{who}',)).fetchone()
@@ -94,6 +95,7 @@ def process_update(database, settings, update, now=None):
         link = active_link(connection, who)
         uid = link['user_id'] if link else None
         if text.startswith('/link '):
+            connection.execute('DELETE FROM telegram_custom_pet_inputs WHERE telegram_id=?',(who,))
             connection.execute('DELETE FROM telegram_device_drafts WHERE telegram_id=?',(who,))
             connection.execute('DELETE FROM telegram_pet_drafts WHERE telegram_id=?',(who,))
             reply, uid = claim(connection, who, text[6:], now)
@@ -102,6 +104,7 @@ def process_update(database, settings, update, now=None):
             reply = 'Storm Bot. Войдите в Storm Control Panel, откройте раздел Telegram и получите код. Отправьте сюда /link и код через пробел. Код действует 5 минут. Пароль и токен бота сюда вводить не нужно.'
             markup = MENU
         elif prepared_user == uid and city is not None:
+            connection.execute('DELETE FROM telegram_custom_pet_inputs WHERE telegram_id=?',(who,))
             connection.execute('DELETE FROM telegram_device_drafts WHERE telegram_id=?',(who,))
             connection.execute('DELETE FROM telegram_pet_drafts WHERE telegram_id=?',(who,))
             if not throttle(connection, f'city:{who}', now, 3):
@@ -114,18 +117,21 @@ def process_update(database, settings, update, now=None):
                 reply = city_error
             markup = MENU
         elif bot_controls.accepts(text):
+            connection.execute('DELETE FROM telegram_custom_pet_inputs WHERE telegram_id=?',(who,))
             connection.execute("UPDATE telegram_links SET input_mode='' WHERE telegram_id=?",(who,))
             connection.execute('DELETE FROM telegram_pet_drafts WHERE telegram_id=?',(who,))
             reply,markup=bot_controls.handle(connection,link,text,settings,now,update['update_id'])
         elif bot_devices.is_device_input(connection, link, text, bool(callback_id)):
+            connection.execute('DELETE FROM telegram_custom_pet_inputs WHERE telegram_id=?',(who,))
             connection.execute("UPDATE telegram_links SET input_mode='' WHERE telegram_id=?",(who,))
             connection.execute('DELETE FROM telegram_pet_drafts WHERE telegram_id=?',(who,))
             reply,markup=bot_devices.handle(connection,link,text,now,bool(callback_id))
         elif bot_pets.is_pet_input(connection, link, text, bool(callback_id)):
             connection.execute('DELETE FROM telegram_device_drafts WHERE telegram_id=?',(who,))
             connection.execute("UPDATE telegram_links SET input_mode='' WHERE telegram_id=?", (who,))
-            reply, markup = bot_pets.handle(connection, link, text, now, bool(callback_id))
+            reply, markup = bot_pets.handle(connection, link, text, now, bool(callback_id),prepared_image)
         else:
+            connection.execute('DELETE FROM telegram_custom_pet_inputs WHERE telegram_id=?',(who,))
             connection.execute('DELETE FROM telegram_device_drafts WHERE telegram_id=?',(who,))
             connection.execute('DELETE FROM telegram_pet_drafts WHERE telegram_id=?', (who,))
             reply, markup = dispatch(connection, link, text, now)

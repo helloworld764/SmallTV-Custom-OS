@@ -1,4 +1,5 @@
 import { AdvancedEditor } from './advanced.mjs';
+import {CustomPetEditor} from './custom-pet.mjs';
 import { ApiClient, ApiError, changesFrom, hasDraftChanges } from './api.mjs';
 import { EnrollmentFlow } from './enrollment.mjs';
 import { DevicePresence, presenceText } from './device-presence.mjs';
@@ -7,6 +8,7 @@ const $ = selector => document.querySelector(selector);
 const state = { session: null, devices: [], selected: null, settings: null, busy: false, more: false, loaded: 0, presence: null };
 let telegramCodeTimer;
 const advancedEditor=new AdvancedEditor($('#settings-form'),()=>state.session);
+const customPetEditor=new CustomPetEditor(()=>state.session);
 
 function clearTelegramCode() {
   clearTimeout(telegramCodeTimer);
@@ -192,6 +194,7 @@ function setBusy(busy) {
 }
 
 function loginView(text = '') {
+  customPetEditor.clear();
   clearDeviceDetails();
   clearEnrollment();
   clearTelegramCode();
@@ -341,6 +344,7 @@ async function loadDevices(append = false) {
 }
 
 async function dashboard(session) {
+  customPetEditor.clear();
   clearDeviceDetails();
   clearEnrollment();
   state.session = session;

@@ -1,6 +1,7 @@
 """Small Telegram Bot API client. Exceptions never contain token-bearing URLs."""
 
 import json
+import re
 from uuid import uuid4
 from urllib.error import HTTPError
 from urllib.request import HTTPRedirectHandler, Request, build_opener
@@ -24,7 +25,7 @@ class TelegramClient:
         self._opener = build_opener(NoRedirect())
 
     def call(self, method, payload=None):
-        if method not in ('getMe', 'getWebhookInfo', 'getUpdates', 'sendMessage', 'editMessageText', 'answerCallbackQuery'):
+        if method not in ('getMe', 'getWebhookInfo', 'getUpdates', 'getFile', 'sendMessage', 'editMessageText', 'answerCallbackQuery'):
             raise ValueError('Unsupported Telegram method')
         return self._request(method,json.dumps(payload or {}).encode('utf-8'),'application/json')
 
@@ -32,6 +33,11 @@ class TelegramClient:
         try:
             with path.open('rb') as file:
                 photo = file.read(1048577)
+        except Exception:raise TelegramError(400) from None
+        return self.send_photo_bytes(payload,photo)
+
+    def send_photo_bytes(self,payload,photo):
+        try:
             if len(photo) > 1048576 or not photo.startswith(b'\x89PNG\r\n\x1a\n'):
                 raise ValueError('Invalid catalogue photo')
             boundary = 'storm'+uuid4().hex
@@ -45,6 +51,20 @@ class TelegramClient:
         except Exception:
             raise TelegramError(400) from None
         return self._request('sendPhoto',bytes(body),'multipart/form-data; boundary='+boundary)
+
+    def download_image(self,file_id):
+        try:
+            if not isinstance(file_id,str) or not 0<len(file_id)<=256:raise ValueError()
+            info=self.call('getFile',{'file_id':file_id})
+            path=info.get('file_path') if isinstance(info,dict) else None
+            size=info.get('file_size') if isinstance(info,dict) else None
+            if (not isinstance(path,str) or len(path)>256 or not re.fullmatch(r'[A-Za-z0-9_-]+(?:/[A-Za-z0-9_.-]+)+',path)
+                    or any(p in ('.','..') for p in path.split('/')) or type(size) is not int or not 0<size<=2097152):raise ValueError()
+            request=Request(f'https://api.telegram.org/file/bot{self._token}/{path}',headers={'Accept':'image/png,image/jpeg'})
+            with self._opener.open(request,timeout=15) as response:raw=response.read(2097153)
+            if not raw or len(raw)>2097152:raise ValueError()
+            return raw
+        except Exception:raise TelegramError() from None
 
     def _request(self, method, data, content_type):
         request = Request(f'https://api.telegram.org/bot{self._token}/{method}',

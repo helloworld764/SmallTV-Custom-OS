@@ -29,6 +29,7 @@ from .weather_forecast import router as forecast_router
 from .device_controls import router as controls_router
 from .codex_screen import router as codex_screen_router
 from .wallpapers import router as wallpapers_router
+from .custom_pets import router as custom_pets_router
 
 
 class Health(BaseModel):
@@ -96,6 +97,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(controls_router)
     app.include_router(codex_screen_router)
     app.include_router(wallpapers_router)
+    app.include_router(custom_pets_router)
 
     @app.get("/health", response_model=Health)
     def health(response: Response) -> Health:
