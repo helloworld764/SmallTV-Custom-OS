@@ -16,6 +16,7 @@ from .config import Settings
 from .database import Database
 from .telegram import active_link, notification_allowed
 from . import bot_custom_pets,custom_pets
+from . import features
 from fastapi import HTTPException
 
 
@@ -78,10 +79,15 @@ def deliver_replies(database, client, now=None, edits_only=False):
             private_photo=None
             if row['photo_asset'] and row['photo_asset'].startswith(('custom:','draft:')):
                 prefix,identifier=row['photo_asset'].split(':',1)
-                if allowed and row['user_id']:
+                if not features.CUSTOM_PETS_ENABLED:allowed=False
+                elif allowed and row['user_id']:
                     try:private_photo=custom_pets.private_image(connection,row['user_id'],identifier,now,draft=prefix=='draft',telegram=True)
                     except HTTPException:allowed=False
                 else:allowed=False
+        if not features.CUSTOM_PETS_ENABLED:
+            queued_markup=json.loads(row['markup'])
+            custom_buttons=any(str(button.get('callback_data','')).startswith('pcustom-') for line in queued_markup.get('inline_keyboard',[]) for button in line)
+            if custom_buttons or '_storm_entities' in queued_markup or (row['photo_asset'] and row['photo_asset'].startswith(('custom:','draft:'))):allowed=False
         if row['expires_at'] > now and allowed:
             try:
                 photo = photo_path(row['photo_asset'])
@@ -109,8 +115,9 @@ def deliver_replies(database, client, now=None, edits_only=False):
 
 
 def poll_once(database, settings, client):
-    with database.transaction() as connection:
-        connection.execute('DELETE FROM pet_image_drafts WHERE confirmed_pet_id IS NULL AND expires_at<=?',(int(time.time()),))
+    if features.CUSTOM_PETS_ENABLED:
+        with database.transaction() as connection:
+            connection.execute('DELETE FROM pet_image_drafts WHERE confirmed_pet_id IS NULL AND expires_at<=?',(int(time.time()),))
     complete_due_sleeps(database)
     scan_needs(database)
     deliver_replies(database, client)
@@ -131,7 +138,7 @@ def poll_once(database, settings, client):
                 client.call('answerCallbackQuery', {'callback_query_id': parsed[2]})
             except TelegramError:
                 pass
-        prepared=bot_custom_pets.prepare(database,client,update,int(time.time())) if parsed and not seen and parsed[1]=='pet-upload' else None
+        prepared=bot_custom_pets.prepare(database,client,update,int(time.time())) if features.CUSTOM_PETS_ENABLED and parsed and not seen and parsed[1]=='pet-upload' else None
         process_update(database, settings, update,prepared_image=prepared)
         with database.transaction() as connection:
             connection.execute('UPDATE telegram_worker_state SET next_offset=max(next_offset, ?) WHERE id=1', (update['update_id']+1,))

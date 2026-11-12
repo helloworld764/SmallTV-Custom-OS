@@ -7,6 +7,8 @@ from backend.app.bot_handler import process_update,identity
 from backend.app.bot_worker import poll_once,deliver_replies
 from backend.app.bot_custom_pets import prepare
 from backend.app.bot_transport import TelegramClient,TelegramError
+from custom_pet_archive import archived_custom_pets
+pytestmark=pytest.mark.usefixtures('archived_custom_pets')
 
 class MediaTelegram(FakeTelegram):
     def __init__(self,updates=None):super().__init__(updates);self.downloads=[]

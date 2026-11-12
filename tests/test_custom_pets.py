@@ -8,6 +8,8 @@ from test_auth import env,template,csrf,sign_in
 from test_wallpapers import picture
 from backend.app import custom_pets
 from backend.app.image_processing import normalize_pet
+from custom_pet_archive import archived_custom_pets
+pytestmark=pytest.mark.usefixtures('archived_custom_pets')
 
 BASE='/api/v1/pets'
 def upload(client,headers,color='red'):

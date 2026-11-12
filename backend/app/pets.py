@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from . import auth, pet_engine as engine
+from . import features
 from .auth import Principal, current_user, now, write_user
 
 
@@ -96,7 +97,7 @@ def require_live_session(connection, principal):
 
 def find_pet(connection, owner_id, pet_id=None):
     # Older migration fixtures and upgrades can still use the original domain API.
-    appearance='(SELECT id FROM pet_appearances WHERE pet_id=pets.id)' if connection.execute("SELECT 1 FROM sqlite_schema WHERE type='table' AND name='pet_appearances'").fetchone() else 'NULL'
+    appearance='(SELECT id FROM pet_appearances WHERE pet_id=pets.id)' if features.CUSTOM_PETS_ENABLED and connection.execute("SELECT 1 FROM sqlite_schema WHERE type='table' AND name='pet_appearances'").fetchone() else 'NULL'
     row = connection.execute(f'''SELECT pets.*, pet_states.*, {appearance} AS image_id FROM pets
         JOIN pet_states ON pet_states.pet_id = pets.id
         WHERE pets.owner_id = ? AND (? IS NULL OR pets.id = ?)''', (owner_id, pet_id, pet_id)).fetchone()
@@ -115,7 +116,7 @@ def view(row, timestamp):
         due = (row['sleep_at'] if row['sleep_at'] is not None else row['updated_at']) + engine.SLEEP_SECONDS
         if 0 <= timestamp-due < engine.REACTION_TTL_SECONDS:
             reaction = Reaction(id=f'auto-wake:{row["id"]}:{due}',kind='WAKE',expires_at=due+engine.REACTION_TTL_SECONDS)
-    return PetView(id=row['id'], kind=row['kind'], name=row['name'], image_id=row.get('image_id'),
+    return PetView(id=row['id'], kind=row['kind'], name=row['name'], image_id=row.get('image_id') if features.CUSTOM_PETS_ENABLED else None,
                    **{key: round(state[key] / engine.UNIT, 2) for key in ('satiety', 'energy', 'mood')},
                    sleeping=bool(state['sleeping']) and state['lifecycle'] == 'ACTIVE',
                    sleep_ends_at=state['sleep_ends_at'] if state['lifecycle'] == 'ACTIVE' and state['sleeping'] else None,
