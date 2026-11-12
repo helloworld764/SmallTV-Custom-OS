@@ -224,9 +224,12 @@ def device_state(device_id: str, request: Request, identity: Annotated[str, Depe
 def revoke(device_id: str, request: Request, principal: Annotated[Principal, Depends(write_user)]):
     with request.app.state.database.transaction() as connection:
         owned_device(connection, device_id, principal)
+        previous=connection.execute('SELECT revoked_at FROM device_credentials WHERE device_id=?',(device_id,)).fetchone()
         connection.execute('UPDATE device_credentials SET revoked_at = ? WHERE device_id = ?', (now(), device_id))
         connection.execute('DELETE FROM device_presence WHERE device_id = ?', (device_id,))
         audit(connection, principal.user.id, 'device.credentials.revoked', device_id)
+        from .device_journal import reset_presence
+        if previous and previous['revoked_at'] is None:reset_presence(connection,device_id,'connection.revoked',now())
     return Response(status_code=204)
 
 
@@ -242,4 +245,6 @@ def rotate(device_id: str, request: Request, principal: Annotated[Principal, Dep
             created_at = excluded.created_at, revoked_at = NULL''', (device_id, token_hash(token), now()))
         connection.execute('DELETE FROM device_presence WHERE device_id = ?', (device_id,))
         audit(connection, principal.user.id, 'device.credentials.rotated', device_id)
+        from .device_journal import reset_presence
+        reset_presence(connection,device_id,'connection.reset',now())
     return CredentialView(device_id=device_id, token=token)

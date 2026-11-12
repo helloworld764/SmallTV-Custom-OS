@@ -1,4 +1,5 @@
 import { AdvancedEditor } from './advanced.mjs';
+import {DeviceJournal} from './device-journal.mjs';
 // Paused by owner; module preserved for restoration.
 // import {CustomPetEditor} from './custom-pet.mjs';
 import { ApiClient, ApiError, changesFrom, hasDraftChanges } from './api.mjs';
@@ -31,6 +32,7 @@ const api = new ApiClient({ onConnection(online) {
   $('#connection').dataset.state = online ? 'online' : 'offline';
 } });
 const enrollment = new EnrollmentFlow(api);
+const deviceJournal=new DeviceJournal(api,status=>{if(status===401)loginView('Сессия завершилась. Войдите снова.');else message('Журнал устройства недоступен этому аккаунту.');});
 let enrollmentTimer;
 
 function clearEnrollment() {
@@ -119,6 +121,7 @@ function nameDirty() {
 function dirty() { return settingsDirty() || nameDirty(); }
 
 function clearDeviceDetails() {
+  deviceJournal.clear();
   advancedEditor.wallpapers.clear();
   state.presence = null;
   $('#device-details').hidden = true;
@@ -163,6 +166,7 @@ async function refreshDevicePresence() {
 }
 
 function applyDeviceName(device) {
+  void deviceJournal.refresh();
   state.devices = state.devices.map(row => row.id === device.id ? device : row);
   $('#device-name').value = device.name;
   $('#settings-title').textContent = device.name;
@@ -320,6 +324,7 @@ async function selectDevice(id) {
     renderSettings();
     $('#device-name').value = selectedDevice().name;
     $('#device-details').hidden = false;
+    deviceJournal.show(id);
     state.presence = new DevicePresence(id);
     renderPresence();
     void refreshDevicePresence();
@@ -551,6 +556,7 @@ $('#settings-form').addEventListener('submit', event => {
     if (!Object.keys(changes).length) { $('#save-result').textContent = 'Изменений нет.'; return; }
     state.settings = await api.save(state.selected, changes, state.session.csrf_token);
     renderSettings();
+    void deviceJournal.refresh();
     $('#save-result').textContent = 'Настройки сохранены на сервере.';
   }, 'save');
 });
@@ -581,7 +587,7 @@ for(const button of document.querySelectorAll('[data-control]')) button.addEvent
   const requestId=crypto.randomUUID();
   run(async()=>{
     await api.request(`/api/v1/devices/${encodeURIComponent(state.selected)}/control`,{method:'POST',headers:{'X-CSRF-Token':state.session.csrf_token},body:{request_id:requestId,action:button.dataset.control,...(button.dataset.screen?{screen:button.dataset.screen}:{})}});
-    state.settings=await api.settings(state.selected);renderSettings();
+    state.settings=await api.settings(state.selected);renderSettings();void deviceJournal.refresh();
     $('#web-remote-status').textContent='Команда сохранена. Превью обновляется автоматически.';
   });
 });

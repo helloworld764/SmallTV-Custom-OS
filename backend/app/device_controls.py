@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, model_validator
 from .auth import Principal, write_user
 from .display_options import screen_for, options
+from .device_journal import record
 
 router=APIRouter(prefix='/api/v1/devices',tags=['device control'])
 SCREEN_ORDER=('clock','weather','tamagotchi','markets','codex')
@@ -32,6 +33,8 @@ def apply_control(connection,device_id,command,user_id,role='user',now=None):
         WHERE devices.id=? AND (owner_id=? OR ?='super_admin')''',(device_id,user_id,role)).fetchone()
     if row is None: raise HTTPException(404,'Device settings not found')
     settings=dict(row)
+    previous_screen=effective_screen(settings,now)
+    previous_brightness=settings['brightness']
     fingerprint=json.dumps({'device_id':device_id,'action':command.action,'screen':command.screen},sort_keys=True)
     connection.execute('DELETE FROM device_control_requests WHERE created_at<?',(now-86400,))
     old=connection.execute('SELECT * FROM device_control_requests WHERE actor_id=? AND request_id=?',
@@ -59,6 +62,10 @@ def apply_control(connection,device_id,command,user_id,role='user',now=None):
     connection.execute('INSERT INTO device_control_requests VALUES (?,?,?,?,?,?)',
                        (user_id,str(command.request_id),device_id,fingerprint,json.dumps(result),now))
     connection.execute("INSERT INTO audit_log(actor_id,action,resource_id) VALUES (?,'device.control.updated',?)",(user_id,device_id))
+    if action in ('next','previous','screen','home') and (settings['current_screen']!=row['current_screen'] or effective_screen(settings,now)!=previous_screen):
+        record(connection,device_id,'screen.changed',now,{'action':action,'screen':effective_screen(settings,now)})
+    elif settings['brightness']!=previous_brightness:
+        record(connection,device_id,'settings.changed',now,{'fields':['brightness'],'brightness':settings['brightness']})
     return result
 
 @router.post('/{device_id}/control')

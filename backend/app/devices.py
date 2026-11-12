@@ -2,7 +2,8 @@
 
 import json
 import time
-from .display_options import DisplayOptions
+from .display_options import DisplayOptions,options
+from .device_journal import record,SETTINGS
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -126,6 +127,7 @@ def rename_device(device_id: str, payload: DevicePatch, request: Request,
             connection.execute('UPDATE devices SET name = ? WHERE id = ?', (payload.name, device_id))
             connection.execute("INSERT INTO audit_log(actor_id,action,resource_id) VALUES (?,'device.renamed',?)",
                                (principal.user.id, device_id))
+            record(connection,device_id,'device.renamed')
         result = dict(row)
         result['name'] = payload.name
         result['is_preview'] = connection.execute('SELECT 1 FROM device_previews WHERE device_id = ?',
@@ -145,10 +147,11 @@ def update_settings(
 def save_settings(connection,device_id,payload,user_id,role='user'):
     """Shared write; the caller authorizes its identity inside this transaction."""
     changes=payload.model_dump(exclude_unset=True)
-    allowed=connection.execute('''SELECT 1 FROM devices JOIN device_settings ON devices.id=device_settings.device_id
+    allowed=connection.execute('''SELECT device_settings.* FROM devices JOIN device_settings ON devices.id=device_settings.device_id
         WHERE devices.id=? AND (owner_id=? OR ?='super_admin')''',(device_id,user_id,role)).fetchone()
     if allowed is None:
         raise HTTPException(404,'Device settings not found')
+    before=dict(allowed)
     if 'advanced' in changes:
         wallpaper=payload.advanced.wallpaper_id
         if wallpaper is not None and connection.execute('SELECT 1 FROM device_wallpapers WHERE id=? AND device_id=?',(str(wallpaper),device_id)).fetchone() is None:
@@ -163,4 +166,10 @@ def save_settings(connection,device_id,payload,user_id,role='user'):
     assignments=', '.join(f'{column} = ?' for column in changes)
     connection.execute(f'UPDATE device_settings SET {assignments} WHERE device_id=?',(*changes.values(),device_id))
     connection.execute("INSERT INTO audit_log(actor_id,action,resource_id) VALUES (?,'device.settings.updated',?)",(user_id,device_id))
+    fields=[]
+    for key in SETTINGS:
+        if key not in changes:continue
+        different=(options(before[key])!=options(changes[key])) if key=='advanced' else before[key]!=changes[key]
+        if different:fields.append(key)
+    if fields:record(connection,device_id,'settings.changed',details={'fields':fields})
     return dict(connection.execute('SELECT * FROM device_settings WHERE device_id=?',(device_id,)).fetchone())

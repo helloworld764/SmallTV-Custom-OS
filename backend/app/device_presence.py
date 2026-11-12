@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict
 
 from .auth import Principal, current_user, now
 from .enrollment import authenticated_device, bearer, owned_device, require_device_key
+from .device_journal import observe_heartbeat
 
 
 router = APIRouter(prefix='/api/v1/devices', tags=['device presence'])
@@ -42,6 +43,7 @@ def heartbeat(device_id: str, payload: HeartbeatRequest, request: Request,
                                 headers={'Retry-After': str(5 - (received_at - previous['last_seen_at']))})
         connection.execute('''INSERT INTO device_presence (device_id, last_seen_at) VALUES (?, ?)
             ON CONFLICT(device_id) DO UPDATE SET last_seen_at = excluded.last_seen_at''', (identity, received_at))
+        observe_heartbeat(connection,identity,request.app.state.settings,received_at)
     return Response(status_code=204)
 
 

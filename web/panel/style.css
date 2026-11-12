@@ -105,3 +105,13 @@ html[data-site-theme=light] #device-presence[data-state=STALE], html[data-site-t
 .wallpaper-editor input, .wallpaper-editor select { margin-bottom:8px; }
 #custom-pet-section > summary { cursor:pointer; font-size:20px; font-weight:650; }
 #custom-pet-preview { display:block; object-fit:contain; max-width:100%; background:#080809; border-radius:12px; margin:12px 0; }
+.device-journal { margin-top:24px; border-top:1px solid var(--border); padding-top:20px; }
+.device-journal summary { font-size:20px; font-weight:650; cursor:pointer; }
+.journal-filter { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin-top:14px; }
+.journal-filter label { margin:0; min-width:0; }.journal-filter input { min-width:0; }
+.journal-filter > label:first-child,.journal-actions { grid-column:1/-1; }
+.journal-actions { display:flex; flex-wrap:wrap; gap:8px; }
+.journal-items { list-style:none; padding:0; margin:16px 0; }
+.journal-items li { display:grid; gap:5px; padding:12px 0; border-bottom:1px solid var(--border); overflow-wrap:anywhere; }
+.journal-items time { color:var(--muted); font-size:12px; font-variant-numeric:tabular-nums; }
+@media(max-width:480px) { .journal-filter { grid-template-columns:minmax(0,1fr); } }

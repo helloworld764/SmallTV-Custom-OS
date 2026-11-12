@@ -8,6 +8,7 @@ from .auth import Principal,current_user,write_user
 from .enrollment import owned_device
 from .pets import require_live_session
 from .image_processing import MAX_UPLOAD,normalize_wallpaper
+from .device_journal import record
 
 router=APIRouter(prefix='/api/v1/devices',tags=['private wallpapers'])
 
@@ -78,6 +79,7 @@ def delete(device_id:str,wallpaper_id:UUID,request:Request,principal:Annotated[P
             if advanced.get('backdrop')=='wallpaper':raise HTTPException(409,'Choose and save another background before deleting the active wallpaper')
             advanced['wallpaper_id']=None
             c.execute('UPDATE device_settings SET advanced=? WHERE device_id=?',(json.dumps(advanced),device_id))
+            record(c,device_id,'settings.changed',details={'fields':['advanced']})
         c.execute('DELETE FROM device_wallpapers WHERE id=? AND device_id=?',(identifier,device_id))
         c.execute("INSERT INTO audit_log(actor_id,action,resource_id) VALUES (?,'wallpaper.deleted',?)",(principal.user.id,device_id))
     return Response(status_code=204)
