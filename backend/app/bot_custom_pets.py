@@ -49,10 +49,13 @@ def handle(c,link,text,now,callback,prepared=None):
         c.execute('DELETE FROM telegram_pet_drafts WHERE telegram_id=?',(who,))
         c.execute('INSERT INTO telegram_custom_pet_inputs(telegram_id,user_id,token,step,expires_at) VALUES (?,?,?,\'photo\',?) ON CONFLICT(telegram_id) DO UPDATE SET user_id=excluded.user_id,token=excluded.token,step=\'photo\',draft_id=NULL,name=NULL,expires_at=excluded.expires_at',
                   (who,uid,uuid4().hex,now+900))
-        return ('Свой питомец: пришлите PNG/JPEG до 2 МБ, затем введите имя и подтвердите превью. На каждый шаг — 15 минут. '
+        prefix=('Свой питомец: пришлите нейтральный PNG/JPEG до 2 МБ, затем введите имя и подтвердите превью. На каждый шаг — 15 минут. '
                 'Новая картинка изменит только образ и имя существующего питомца, сохранив прогресс и ожидание возвращения. '
-                'Прозрачный PNG лучше отправить как файл, без сжатия Telegram. Реакции для одного кадра — значки и подписи.\n\n'
-                'Шаблон для внешнего генератора:\n'+custom_pets.PROMPT),cancel
+                'PNG лучше отправить как файл, без сжатия Telegram. Сейчас загружается только neutral.png; остальные состояния сохраните для последующего подключения. '
+                'Реакции одного кадра — значки и подписи.\n\n'
+                '📋 Шаблон для внешнего генератора. Нажмите значок копирования на блоке:\n')
+        cancel['_storm_entities']=[{'type':'pre','offset':len(prefix.encode('utf-16-le'))//2,'length':len(custom_pets.PROMPT.encode('utf-16-le'))//2}]
+        return prefix+custom_pets.PROMPT,cancel
     if text.startswith('pcustom-confirm:'):
         identifier=text.split(':',1)[1]
         previous=c.execute('SELECT confirmed_pet_id FROM pet_image_drafts WHERE id=? AND user_id=?',(identifier,uid)).fetchone()

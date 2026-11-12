@@ -86,6 +86,7 @@ def deliver_replies(database, client, now=None, edits_only=False):
             try:
                 photo = photo_path(row['photo_asset'])
                 markup = json.loads(row['markup'])
+                entities=markup.pop('_storm_entities',None)
                 if row['edit_message_id'] is not None:
                     client.call('editMessageText', {'chat_id': row['telegram_id'], 'message_id': row['edit_message_id'],
                                                   'text': text, 'reply_markup': markup})
@@ -94,7 +95,8 @@ def deliver_replies(database, client, now=None, edits_only=False):
                 elif photo and photo.is_file():
                     client.send_photo({'chat_id': row['telegram_id'], 'caption': text, 'reply_markup': markup}, photo)
                 else:
-                    client.call('sendMessage', {'chat_id': row['telegram_id'], 'text': text, 'reply_markup': markup})
+                    client.call('sendMessage', {'chat_id': row['telegram_id'], 'text': text, 'reply_markup': markup,
+                                               **({'entities':entities} if entities else {})})
             except TelegramError as error:
                 if error.status not in (400, 403):
                     raise

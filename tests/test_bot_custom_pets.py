@@ -42,6 +42,23 @@ def test_bot_own_pet_photo_name_preview_confirm_repeat_and_shared_api(env):
     assert any(method=='sendPrivatePhoto' for method,_ in client.calls)
     assert 'not-stored.png' not in json.dumps(client.calls)
 
+def test_full_prompt_states_are_copied_as_one_native_pre_block_after_queue_reload(env):
+    from backend.app.custom_pets import PROMPT
+    link(env);_,start=apply(env,'pcustom-start',callback=True)
+    markup=json.loads(start['markup']);entity=markup['_storm_entities'][0]
+    assert entity['type']=='pre' and len(start['text'])<4096
+    encoded=start['text'].encode('utf-16-le')
+    assert encoded[entity['offset']*2:(entity['offset']+entity['length'])*2].decode('utf-16-le')==PROMPT
+    for state in ('neutral','happy','eating','playing','sleeping','waking','hungry_sad','tired','blink'):
+        assert state+'.png' in PROMPT
+    assert PROMPT.count('[ВСТАВЬ СЮДА ОПИСАНИЕ СВОЕГО ПИТОМЦА]')==1
+    assert 'только neutral.png' in start['text']
+    client=MediaTelegram();deliver_replies(env['db'],client)
+    payload=next(p for method,p in client.calls if method=='sendMessage' and p.get('entities'))
+    assert payload['entities']==[entity]
+    assert '_storm_entities' not in payload['reply_markup'] and 'parse_mode' not in payload
+    assert payload['text']==start['text']
+
 def test_bot_media_without_opt_in_and_other_chat_never_downloaded(env):
     link(env);client=MediaTelegram();assert prepare(env['db'],client,photo(env),int(time.time())) is None
     apply(env,'pcustom-start',callback=True)
