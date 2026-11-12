@@ -4,6 +4,8 @@ from uuid import uuid4
 import pytest
 from test_auth import env,template,csrf,sign_in
 from backend.app import device_journal,device_presence,device_controls
+from device_journal_archive import archived_device_journal
+pytestmark=pytest.mark.usefixtures('archived_device_journal')
 
 BASE='/api/v1/devices/alice-tv'
 

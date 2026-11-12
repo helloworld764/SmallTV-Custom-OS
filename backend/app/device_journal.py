@@ -3,6 +3,7 @@ import base64,binascii,json
 from typing import Annotated,Literal
 from fastapi import APIRouter,Depends,HTTPException,Query,Request
 from .auth import Principal,current_user,now
+from . import features
 
 router=APIRouter(prefix='/api/v1/devices',tags=['device journal'])
 SETTINGS=('brightness','theme','start_screen','clock_format','clock_seconds','clock_style','device_style','clock_layout','advanced')
@@ -12,7 +13,7 @@ Group=Literal['all','name','settings','screen','connection']
 
 def ready(c):
     # Domain helpers are also used to seed older, deliberately partial migration fixtures.
-    return (c.execute('SELECT max(version) FROM schema_migrations').fetchone()[0] or 0)>=26
+    return features.DEVICE_JOURNAL_ENABLED and (c.execute('SELECT max(version) FROM schema_migrations').fetchone()[0] or 0)>=26
 
 def safe_details(kind,value):
     if not isinstance(value,dict):return {}

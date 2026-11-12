@@ -91,23 +91,25 @@ const check=(value,label)=>{if(!value)throw new Error(label);};
  step='delete unused';mediaButton('Удалить выбранные обои').click();await wait(()=>document.querySelector('.wallpaper-editor [role="status"]').textContent.includes('Обои удалены'));
  check((await(await fetch('/api/v1/devices/qa-tv/wallpapers')).json()).length===0,'Delete did not remove wallpaper');
  check(!document.querySelector('#custom-pet-section'),'Paused custom pet setup must not appear');
- step='device journal';
- const journal=document.querySelector('#device-journal');journal.open=true;
- await wait(()=>document.querySelectorAll('#journal-items li').length>0);
- for(let n=0;n<26;n++){
-   const response=await fetch('/api/v1/devices/qa-tv/settings',{method:'PATCH',headers:{'Content-Type':'application/json','X-CSRF-Token':session.csrf_token},body:JSON.stringify({brightness:n%2?41:42})});
-   check(response.ok,'Could not seed journal through settings API');
- }
- input('#journal-group','settings');document.querySelector('#journal-filter').requestSubmit();
- await wait(()=>document.querySelectorAll('#journal-items li').length===25&&!document.querySelector('#journal-more').hidden&&!document.querySelector('#journal-more').disabled);
- check([...document.querySelectorAll('#journal-items li span')].every(n=>n.textContent.startsWith('Настройки сохранены')),'Journal filter mixed categories');
- document.querySelector('#journal-more').click();await wait(()=>document.querySelectorAll('#journal-items li').length>25);
- input('#journal-group','connection');document.querySelector('#journal-filter').requestSubmit();
- await wait(()=>document.querySelector('#journal-status').textContent.includes('событий пока нет'));
- check(document.querySelectorAll('#journal-items li').length===0,'Preview must not invent heartbeat events');
- input('#journal-since','2026-11-12T12:00');input('#journal-until','2026-11-11T12:00');document.querySelector('#journal-filter').requestSubmit();
- check(document.querySelector('#journal-status').textContent.includes('позже'),'Invalid journal date range not explained');
- document.querySelector('#journal-reset').click();await wait(()=>document.querySelectorAll('#journal-items li').length===25);
+ check(!document.querySelector('#device-journal'),'Removed journal must not appear');
+ // Archived journal scenario; disabled with the product UI.
+ // step='device journal';
+ // const journal=document.querySelector('#device-journal');journal.open=true;
+ // await wait(()=>document.querySelectorAll('#journal-items li').length>0);
+ // for(let n=0;n<26;n++){
+ //   const response=await fetch('/api/v1/devices/qa-tv/settings',{method:'PATCH',headers:{'Content-Type':'application/json','X-CSRF-Token':session.csrf_token},body:JSON.stringify({brightness:n%2?41:42})});
+ //   check(response.ok,'Could not seed journal through settings API');
+ // }
+ // input('#journal-group','settings');document.querySelector('#journal-filter').requestSubmit();
+ // await wait(()=>document.querySelectorAll('#journal-items li').length===25&&!document.querySelector('#journal-more').hidden&&!document.querySelector('#journal-more').disabled);
+ // check([...document.querySelectorAll('#journal-items li span')].every(n=>n.textContent.startsWith('Настройки сохранены')),'Journal filter mixed categories');
+ // document.querySelector('#journal-more').click();await wait(()=>document.querySelectorAll('#journal-items li').length>25);
+ // input('#journal-group','connection');document.querySelector('#journal-filter').requestSubmit();
+ // await wait(()=>document.querySelector('#journal-status').textContent.includes('событий пока нет'));
+ // check(document.querySelectorAll('#journal-items li').length===0,'Preview must not invent heartbeat events');
+ // input('#journal-since','2026-11-12T12:00');input('#journal-until','2026-11-11T12:00');document.querySelector('#journal-filter').requestSubmit();
+ // check(document.querySelector('#journal-status').textContent.includes('позже'),'Invalid journal date range not explained');
+ // document.querySelector('#journal-reset').click();await wait(()=>document.querySelectorAll('#journal-items li').length===25);
  // Retained custom-pet browser scenario; restore together with UI wiring.
  // step='custom pet upload';
  // const custom=document.querySelector('#custom-pet-section');custom.open=true;
