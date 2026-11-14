@@ -1,5 +1,56 @@
 # Storm OS — история локальных проверок
 
+## 14 ноября 2026 — подготовка к серверу и устройству
+
+Программный этап без SmallTV и развёртывания Debian. Проверены отдельный device
+display API, HTTPS Monitor, компактные ресурсы, lock-файлы и инструменты пакета.
+TZ.md, AGENTS.md, применённые миграции и пользовательские данные не изменялись.
+Свои питомцы и пользовательский журнал остаются отключёнными.
+
+- Windows Python3.12.14, чистая `tmp/locked-windows`: **696 passed** без браузерных
+  модулей; отдельно все **8 Chrome-тестов passed**. Итого весь набор: **704 passed**.
+- Linux/WSL Kali Python3.13.12, новая venv с offline wheels из lock:
+  **696 passed, 8 skipped** — в Linux отсутствует Chrome. Это проверка
+  переносимости Linux, не приёмка реального Debian13.
+- JavaScript: **91 passed** на Windows Node24.12.0 и Linux Node24.22.3.
+- C++17: native raster validator с `-Wall -Wextra -Werror -pedantic` прошёл в Linux.
+- Существующее предупреждение Starlette TestClient об httpx сохраняется;
+  зависимости установились из lock, `pip check` не нашёл конфликтов.
+
+Windows-набор выполнен двумя непересекающимися группами:
+
+```powershell
+.\tmp\locked-windows\Scripts\python.exe -m pytest -q --ignore=tests/test_advanced_panel_browser.py --ignore=tests/test_clock_browser.py --ignore=tests/test_codex_browser.py --ignore=tests/test_weather_browser.py
+.\tmp\locked-windows\Scripts\python.exe -m pytest -q tests/test_advanced_panel_browser.py tests/test_clock_browser.py tests/test_codex_browser.py tests/test_weather_browser.py
+node --test tests/*.test.mjs
+```
+
+Исправлены обнаруженные при проверке краевые случаи: диагностический probe
+отклоняет неполные/чужие ответы и очищает приватный снимок при401/403;
+STP1-обои сохраняют прозрачные поля и допускают пустой прозрачный фон.
+Изолированный HTTP-тест делает30 циклов, отключает/перезапускает backend и
+отзывает ключ. TLS-тест использует временную CA и проверяет неизвестную CA,
+чужой hostname и redirect. Настоящие пользователи/бот в тестах не участвуют.
+
+Старый Chrome `--dump-dom` зависал в проверках часов/погоды. Тестовый запуск
+заменён на локальный CDP с отдельным профилем, ожиданием JSON-отчёта и явным
+закрытием. Из браузера передаётся только отчёт проверок, не весь большой DOM.
+Все прежние assertions размеров/перекрытий/стилей, количества сцен и screenshots
+сохранены. Сценарий Codex сначала формирует112 сцен, затем измеряет готовую сетку.
+
+Каталог27 кадров и кириллический bitmap-шрифт воспроизведены побайтно.
+Проверены источники/SHA256 и SIL OFL. Синтетический backup, созданный Windows,
+восстановлен в Linux со схемой26: данные/прогресс сохранены, старый доступ отозван.
+Проверены воспроизводимость zip, checksum manifest, отказ traversal/подмене,
+исключение секретных путей и запуск распакованного runtime-пакета на тестовой БД.
+Локальные XML/log отчёты находятся в игнорируемом tmp и не публикуются в Git.
+
+После обновления установлен CLI0.169.0: check_cli подтвердил version/help,
+json/sandbox/read-only флаги. **Новая реальная модельная задача не запускалась**:
+real_run_checked=false; прежние подтверждённые реальные потоки относятся к0.167.0.
+Физические RAM/Flash/LCD/GPIO, Wi-Fi provisioning, recovery/OTA, удалённый Debian
+endpoint/службы и72-часовые испытания этим этапом не подтверждены.
+
 Это последовательная история этапов, а не единый отчёт о текущем состоянии.
 Фразы о недоступности CLI или отсутствии Monitor относятся к датированным проверкам
 ниже. Текущее состояние: локальный Windows-мост run-smoke/run-task реализован,

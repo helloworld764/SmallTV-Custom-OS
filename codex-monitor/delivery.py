@@ -1,4 +1,4 @@
-"""Loopback-only HTTP delivery with a durable, identity-bound SQLite outbox."""
+"""Verified HTTPS or loopback HTTP delivery with an identity-bound SQLite outbox."""
 
 from contextlib import closing
 from http.client import HTTPException
@@ -6,8 +6,9 @@ import json
 from pathlib import Path
 import sqlite3
 import time
+import ssl
 from urllib.error import HTTPError, URLError
-from urllib.request import Request, build_opener, ProxyHandler, HTTPRedirectHandler
+from urllib.request import Request, build_opener, ProxyHandler, HTTPRedirectHandler,HTTPSHandler
 from uuid import UUID
 
 
@@ -19,7 +20,8 @@ class NoRedirect(HTTPRedirectHandler):
 class Client:
     def __init__(self, credential):
         self.credential = credential
-        self.opener = build_opener(ProxyHandler({}), NoRedirect())
+        context=ssl.create_default_context(cafile=getattr(credential,'ca_file',None))
+        self.opener = build_opener(ProxyHandler({}), NoRedirect(),HTTPSHandler(context=context))
 
     def request(self, route, payload=None):
         # Only fixed routes; never allow caller-provided hosts or arbitrary paths.

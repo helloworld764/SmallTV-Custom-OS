@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import tempfile
 import pytest
+from browser_harness import capture
 
 ROOT=Path(__file__).resolve().parents[1]
 
@@ -35,6 +36,11 @@ for(const state of ['WORKING','IDLE','DONE','ERROR','INTERRUPTED','UNKNOWN','OFF
  const reported=['UNKNOWN','OFFLINE'].includes(state)?'WORKING':state;
  const data={device_id:'tv',server_time:1000,stale_after_seconds:30,offline_after_seconds:90,agent_count:1,agent_name:'Windows — очень длинное имя устройства',last_seen_at:presence==='ONLINE'?1000:presence==='STALE'?950:900,presence,state,reason:null,run:state==='IDLE'?null:{run_id:'run',last_reported_state:reported,started_at:900,updated_at:990,duration_seconds:['UNKNOWN','OFFLINE'].includes(state)?null:state==='WORKING'?100:90}};
  const model=new CodexScreen('tv');model.apply(data,0);renderCodex(cell,model.view(0),'UTC');
+ samples.push({cell,style,theme,state});
+}
+// Measure after all scenes are rendered: avoid forcing whole-grid layout 112 times.
+for(const {cell,style,theme,state} of samples){
+ const screen=cell.querySelector('.display');
  const box=screen.getBoundingClientRect();let bottom=box.top;
  for(const key of ['header','.codex-top','.codex-hero','.codex-clock','.codex-meta','#codex-hint']) {
   const node=cell.querySelector(key),r=node.getBoundingClientRect();
@@ -43,7 +49,6 @@ for(const state of ['WORKING','IDLE','DONE','ERROR','INTERRUPTED','UNKNOWN','OFF
   bottom=r.bottom;
  }
  const status=cell.querySelector('#codex-status');if(status.scrollWidth>status.clientWidth+1)failures.push(`${style}/${theme}/${state}: status clipped`);
- samples.push({style,theme,state});
 }
 document.querySelector('#report').textContent=JSON.stringify({count:samples.length,failures});
 '''
@@ -52,7 +57,7 @@ document.querySelector('#report').textContent=JSON.stringify({count:samples.leng
         page=work/'codex.html'
         page.write_text('<!doctype html><meta charset="utf-8"><style>'+css+'body{padding:20px}main{max-width:none;display:grid;grid-template-columns:repeat(4,240px);gap:20px}</style><main></main><pre id="report"></pre><script>'+renderer+'\nconst DISPLAY='+json.dumps(display)+';\n'+script+'</script>',encoding='utf-8')
         screenshot=tmp_path/'codex-styles.png'
-        result=subprocess.run([chrome,'--headless=new','--no-first-run','--disable-background-networking','--disable-component-update','--disable-extensions','--disable-gpu','--hide-scrollbars','--window-size=1080,1120','--virtual-time-budget=1500','--user-data-dir='+str(work/'profile'),'--screenshot='+str(screenshot),'--dump-dom',page.as_uri()],capture_output=True,text=True,encoding='utf-8',errors='replace',timeout=90,**({'creationflags':subprocess.CREATE_NO_WINDOW} if os.name=='nt' else {}))
+        result=capture(chrome,work,page,screenshot,'#report',1080,1120)
         assert result.returncode==0
         match=re.search(r'<pre id="report">([^<]+)</pre>',result.stdout)
         assert match,'Codex browser report missing'

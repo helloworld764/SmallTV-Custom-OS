@@ -4,6 +4,9 @@
 HTTP с heartbeat и Windows DPAPI для ключа. Есть `run-task` для новых явно
 запускаемых read-only задач; постоянного Monitor всех/интерактивных сессий нет.
 Codex на Debian не переносится. [Инструкция run-task](../docs/task-runner.md).
+Транспорт поддерживает проверяемый удалённый HTTPS и отдельную очередь для
+нового endpoint: [monitor-server.md](../docs/monitor-server.md).
+Настоящий Debian endpoint этим этапом не подключался.
 
 ```powershell
 .\.venv\Scripts\python.exe codex-monitor/local_monitor.py run-task --cwd . --show-answer

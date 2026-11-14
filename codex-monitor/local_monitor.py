@@ -18,13 +18,14 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description='Storm local monitor bridge (loopback only)')
+    parser = argparse.ArgumentParser(description='Storm Windows monitor bridge (verified HTTPS or loopback HTTP)')
     parser.add_argument('--key-file', type=Path, default=ROOT / 'secrets' / 'storm-agent.dpapi')
     parser.add_argument('--outbox', type=Path, default=ROOT / 'data' / 'codex-monitor' / 'outbox.sqlite3')
     commands = parser.add_subparsers(dest='command', required=True)
     setup = commands.add_parser('init-key', help='Store an already-issued agent key using current-user Windows DPAPI')
     setup.add_argument('--agent-id', required=True)
     setup.add_argument('--url', default='http://127.0.0.1:8000')
+    setup.add_argument('--ca-file',type=Path,help='Optional trusted CA certificate for a private HTTPS server')
     commands.add_parser('status', help='Local queue count, no HTTP/model calls')
     commands.add_parser('check-key-store', help='DPAPI roundtrip with disposable random bytes; no real key needed')
     commands.add_parser('flush', help='Deliver saved events and a current heartbeat; no model call')
@@ -51,7 +52,7 @@ def main(argv=None):
             with warnings.catch_warnings():
                 warnings.simplefilter('error', getpass.GetPassWarning)
                 token = getpass.getpass('Agent key (hidden): ')
-            credential = Credential(options.url, options.agent_id, token)
+            credential = Credential(options.url, options.agent_id, token,str(options.ca_file) if options.ca_file else None)
             save_credential(options.key_file, credential)
             result = {'status': 'key_saved'}
         else:

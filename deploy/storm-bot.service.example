@@ -1,0 +1,26 @@
+# TEMPLATE ONLY. Exactly one polling worker per bot token, including Windows.
+[Unit]
+Description=Storm Bot polling worker
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=storm
+Group=storm
+WorkingDirectory=/opt/storm/current
+EnvironmentFile=/etc/storm/storm.env
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/opt/storm/current/.venv/bin/python -m backend.app.bot_worker run
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=60
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/storm
+
+[Install]
+WantedBy=multi-user.target

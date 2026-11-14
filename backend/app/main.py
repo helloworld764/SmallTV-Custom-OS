@@ -29,6 +29,7 @@ from .weather_forecast import router as forecast_router
 from .device_controls import router as controls_router
 from .codex_screen import router as codex_screen_router
 from .wallpapers import router as wallpapers_router
+from .device_display import router as device_display_router
 # Device journal removed from product; retained module/migration are not mounted.
 # from .device_journal import router as journal_router
 # Paused by owner: preserve the module, keep every custom-pet API route unmounted.
@@ -100,6 +101,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(controls_router)
     app.include_router(codex_screen_router)
     app.include_router(wallpapers_router)
+    app.include_router(device_display_router)
     # app.include_router(journal_router)
     # app.include_router(custom_pets_router)  # Custom pet setup temporarily paused.
 

@@ -1,0 +1,236 @@
+{
+  "schema_version": 1,
+  "purpose": "device protocol preparation; LCD/Flash/RAM not hardware-validated",
+  "encoding": "STP1",
+  "files": {
+    "Pixel-neutral.spt": {
+      "width": 128,
+      "height": 128,
+      "palette_entries": 256,
+      "pixel_offset": 1036,
+      "bytes": 17420,
+      "sha256": "5aa7a4725c1f6657a27b292b0f2d5eea184015e71a9d054df9751fe5bc15e6bd"
+    },
+    "Pixel-happy.spt": {
+      "width": 128,
+      "height": 128,
+      "palette_entries": 256,
+      "pixel_offset": 1036,
+      "bytes": 17420,
+      "sha256": "4a4d5ace21349d1f2b8110a6643bdfbd7dfffb0d6d0782158c8a786debaf1031"
+    },
+    "Pixel-eating.spt": {
+      "width": 128,
+      "height": 128,
+      "palette_entries": 256,
+      "pixel_offset": 1036,
+      "bytes": 17420,
+      "sha256": "e2e5bef5f5af5d71a8ed37251cadb298af92df252296c3b706d2d213fd422921"
+    },
+    "Pixel-playing.spt": {
+      "width": 128,
+      "height": 128,
+      "palette_entries": 256,
+      "pixel_offset": 1036,
+      "bytes": 17420,
+      "sha256": "dcaefed0201ca5881ac56c79f981755b70189afb29c2c366c7b1c866670e1243"
+    },
+    "Pixel-sleeping.spt": {
+      "width": 128,
+      "height": 128,
+      "palette_entries": 256,
+      "pixel_offset": 1036,
+      "bytes": 17420,
+      "sha256": "dbcde28a707824404feda52d9ae776af41c28107450d51d58bc2060885162568"
+    },
+    "Pixel-waking.spt": {
+      "width": 128,
+      "height": 128,
+      "palette_entries": 256,
+      "pixel_offset": 1036,
+      "bytes": 17420,
+      "sha256": "55dfd932dda6f8b317ee30ef85483e76ec6c658f03c5e818d05b16428de57d49"
+    },
+    "Pixel-hungry_sad.spt": {
+      "width": 128,
+      "height": 128,
+      "palette_entries": 256,
+      "pixel_offset": 1036,
+      "bytes": 17420,
+      "sha256": "84007d39ce7df02a65bf87f543dc9553fd9e10a58519beaa48921d5f25405fa6"
+    },
+    "Pixel-tired.spt": {
+      "width": 128,
+      "height": 128,
+      "palette_entries": 256,
+      "pixel_offset": 1036,
+      "bytes": 17420,
+      "sha256": "f2195f7a0f209353b8fd519ab4ff2806ba52d67c22038fb7fa9956dca7563d95"
+    },
+    "Pixel-blink.spt": {
+      "width": 128,
+      "height": 128,
+      "palette_entries": 256,
+      "pixel_offset": 1036,
+      "bytes": 17420,
+      "sha256": "7693e4d6b717eaa1c2e050210dfa6a747d9b8aa2e64d251812dfcf771cb73aa3"
+    },
+    "Byte-neutral.spt": {
+      "width": 128,
+      "height": 128,
+      "palette_entries": 256,
+      "pixel_offset": 1036,
+      "bytes": 17420,
+      "sha256": "5543de9b36d5bfb42fa7500af22da1be5b64f04a95274de2e8630db9dc7c2f64"
+    },
+    "Byte-happy.spt": {
+      "width": 128,
+      "height": 128,
+      "palette_entries": 256,
+      "pixel_offset": 1036,
+      "bytes": 17420,
+      "sha256": "6a8b539e8318b0fa2e53f167989a8c86bc2f7555bfa395a9c7e598b9cd0d48e5"
+    },
+    "Byte-eating.spt": {
+      "width": 128,
+      "height": 128,
+      "palette_entries": 256,
+      "pixel_offset": 1036,
+      "bytes": 17420,
+      "sha256": "2f61ed44cf3d372f3add7ddc887aa8ab00c21cfe256efba15a5f4c55f437b5db"
+    },
+    "Byte-playing.spt": {
+      "width": 128,
+      "height": 128,
+      "palette_entries": 256,
+      "pixel_offset": 1036,
+      "bytes": 17420,
+      "sha256": "46553a5c83ebd94beddfaea8949b6d0806cf4f49f7c37f7036806e66fabfd807"
+    },
+    "Byte-sleeping.spt": {
+      "width": 128,
+      "height": 128,
+      "palette_entries": 256,
+      "pixel_offset": 1036,
+      "bytes": 17420,
+      "sha256": "d840e946dc98d0f09ea2462a527e21a90ee75acac29b61173401e8de5c192ace"
+    },
+    "Byte-waking.spt": {
+      "width": 128,
+      "height": 128,
+      "palette_entries": 256,
+      "pixel_offset": 1036,
+      "bytes": 17420,
+      "sha256": "8b50539158593b9257d6cdc878532d6a78cf8cbe3df640ec6cd49148b793e43c"
+    },
+    "Byte-hungry_sad.spt": {
+      "width": 128,
+      "height": 128,
+      "palette_entries": 256,
+      "pixel_offset": 1036,
+      "bytes": 17420,
+      "sha256": "70ee3d035e3bb3e3471091fc289ff42c0ffb1f3b1be1bc9a49569bb43a60b612"
+    },
+    "Byte-tired.spt": {
+      "width": 128,
+      "height": 128,
+      "palette_entries": 256,
+      "pixel_offset": 1036,
+      "bytes": 17420,
+      "sha256": "ba404dd17e7f426949ea9764985ea2800b0d8afef0848298ca73d8a2289d837a"
+    },
+    "Byte-blink.spt": {
+      "width": 128,
+      "height": 128,
+      "palette_entries": 256,
+      "pixel_offset": 1036,
+      "bytes": 17420,
+      "sha256": "7bcf644113d519a084bc840250e4dbdaae82b1180f349f5732855db7cb5d36db"
+    },
+    "Glitch-neutral.spt": {
+      "width": 128,
+      "height": 128,
+      "palette_entries": 256,
+      "pixel_offset": 1036,
+      "bytes": 17420,
+      "sha256": "d6d5618b0795072ddf049ac62ba59513c90a842829f95d6c3fb7221b5f9738bd"
+    },
+    "Glitch-happy.spt": {
+      "width": 128,
+      "height": 128,
+      "palette_entries": 256,
+      "pixel_offset": 1036,
+      "bytes": 17420,
+      "sha256": "2dc39c561f39ac47b932710346be3ede487cd395cd91594389cc2458b352cc8a"
+    },
+    "Glitch-eating.spt": {
+      "width": 128,
+      "height": 128,
+      "palette_entries": 256,
+      "pixel_offset": 1036,
+      "bytes": 17420,
+      "sha256": "95f42b7209a340f152f80c8f51dc4fa76fe148689195cdd84767259f4bee8a3b"
+    },
+    "Glitch-playing.spt": {
+      "width": 128,
+      "height": 128,
+      "palette_entries": 256,
+      "pixel_offset": 1036,
+      "bytes": 17420,
+      "sha256": "28871109d4a1375c378eded046552e69cc89031a8855f7029ef5544e7dc218ff"
+    },
+    "Glitch-sleeping.spt": {
+      "width": 128,
+      "height": 128,
+      "palette_entries": 256,
+      "pixel_offset": 1036,
+      "bytes": 17420,
+      "sha256": "a912826a438b55ddc8d2b6014a98192c1f34ef98973acccaef906d740def4668"
+    },
+    "Glitch-waking.spt": {
+      "width": 128,
+      "height": 128,
+      "palette_entries": 256,
+      "pixel_offset": 1036,
+      "bytes": 17420,
+      "sha256": "3101805e0c9f5b68afeb0fbbb6b1a0a58fecc9c9ed793d585baa2055791679fb"
+    },
+    "Glitch-hungry_sad.spt": {
+      "width": 128,
+      "height": 128,
+      "palette_entries": 256,
+      "pixel_offset": 1036,
+      "bytes": 17420,
+      "sha256": "123b5c4e0435a24acd0a97fa23a28a45a1fd87217341e00811e069dca3258d12"
+    },
+    "Glitch-tired.spt": {
+      "width": 128,
+      "height": 128,
+      "palette_entries": 256,
+      "pixel_offset": 1036,
+      "bytes": 17420,
+      "sha256": "c7dcc9f9b88397051e32dab1a09b0364cdafb7276bb9dc05f8853ffa2458da92"
+    },
+    "Glitch-blink.spt": {
+      "width": 128,
+      "height": 128,
+      "palette_entries": 256,
+      "pixel_offset": 1036,
+      "bytes": 17420,
+      "sha256": "86a52d0fef56b9388343e6042dcb66ce268b4e7759d7fa8caad4a60212b87c30"
+    }
+  },
+  "sources": {
+    "Pixel-states.png": "5be0e3cfb331ea999393fbbccf785860cc8a7d4ccdd052b6f340ac374665f19e",
+    "Byte-states.png": "f282e8689b9bab2e385d3b963edfdc45af7abdd2eff6b1465078e767d53ea754",
+    "Glitch-states.png": "ee6808207a3f90d7af245964b829d69212bd49f64ba073cca79b7646a3349066"
+  },
+  "font": {
+    "glyphs": 166,
+    "bitmap_bytes": 7968,
+    "sha256": "734f7a6f04625e30a21166ec4c01b43a14f409f7ccaeaef59b673c6ed6d84bb8",
+    "cell_bytes": 48,
+    "license_file": "assets/fonts/OFL.txt"
+  },
+  "total_raster_bytes": 470340
+}

@@ -134,10 +134,13 @@ def store_preference(connection, user_id, match):
 
 @router.get("/weather")
 def current_weather(principal: Annotated[Principal, Depends(current_user)], request: FastAPIRequest):
+    return weather_for_owner(request,principal.user.id)
+
+def weather_for_owner(request,owner_id):
     settings = request.app.state.settings
     now = int(time.time())
     with request.app.state.database.connection() as connection:
-        place = _preference(connection, principal.user.id)
+        place = _preference(connection, owner_id)
         key = _cache_key(place["latitude"], place["longitude"])
         cached = connection.execute("SELECT * FROM weather_cache WHERE cache_key=?", (key,)).fetchone()
     if cached and now - cached["fetched_at"] < settings.weather_cache_seconds:

@@ -1,5 +1,11 @@
 # Storm OS
 
+Подготовка к переносу и устройству: [готовность и проверки](docs/server-readiness.md),
+[серверный пакет/восстановление](docs/server-transfer.md),
+[device display API](docs/device-display-protocol.md),
+[компактные ресурсы](docs/device-assets.md), [Monitor по HTTPS](docs/monitor-server.md).
+Настоящая прошивка и аппаратная совместимость ещё не подтверждены.
+
 Пользовательский журнал устройства убран по указанию владельца.
 <!-- Архив реализации журнала: docs/device-journal.md. -->
 
@@ -52,7 +58,10 @@ Weather city preferences, API behavior and provider constraints: [docs/weather.m
 ```text
 backend/app/      API, конфигурация и точка запуска
 backend/migrations/  нумерованные SQL-миграции
-firmware/         описание будущего аппаратного компонента, без прошивки
+firmware/        переносимый протокол, компактные ресурсы, software probe; без прошивки платы
+assets/fonts/    лицензированный кириллический шрифт и данные происхождения
+deploy/          только шаблоны, ничего не устанавливают
+tools/           проверка/сборка пакета и воспроизводимых ресурсов
 assets/pets/     исходники, приватный просмотр и обзорные листы
 web/simulator/   HTML/CSS/JS симулятор и три публичных кадра каталога
 web/panel/       локальная веб-панель: вход, устройства и настройки
@@ -78,26 +87,28 @@ SQLite хранит базовый реестр пользователей, ус
 
 ## Windows (PowerShell)
 
-Нужен Python 3.11+ с модулем venv. Из корня проекта:
+Проверяемые версии — Python3.12 (Windows) и3.13 (Linux), с модулем venv. Из корня проекта:
 
 ```powershell
 py -3 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r backend/requirements-dev.txt
+.\.venv\Scripts\python.exe -m pip install -r backend/requirements-dev.lock
 .\.venv\Scripts\python.exe -m backend.app
 ```
 
 Активация окружения и изменение ExecutionPolicy не требуются.
 Если `py` недоступен, используйте полный путь к установленному `python.exe`.
-Для запуска без тестовых зависимостей устанавливайте `backend/requirements.txt`.
+Для запуска без тестовых зависимостей устанавливайте `backend/requirements-runtime.lock`.
+Исходные `requirements.txt`/`requirements-dev.txt` сохраняют допустимые диапазоны;
+lock-файлы фиксируют проверенные версии и транзитивные зависимости.
 
 ## Debian (ручной локальный запуск)
 
-Нужны Python 3.11+, pip и поддержка venv; установка системных пакетов здесь не выполняется.
+Нужны Python, pip и поддержка venv (Linux-проверка выполнена на3.13); установка системных пакетов здесь не выполняется.
 Из корня проекта, от обычного пользователя:
 
 ```bash
 python3 -m venv .venv
-.venv/bin/python -m pip install -r backend/requirements-dev.txt
+.venv/bin/python -m pip install -r backend/requirements-dev.lock
 .venv/bin/python -m backend.app
 ```
 
@@ -371,19 +382,20 @@ Debian:
 node --test tests/*.test.mjs
 ```
 
-Node.js 20+ нужен только для JavaScript-тестов; симулятор работает в современном
+Node.js 24 нужен для проверенного набора JavaScript/Chrome CDP-тестов; симулятор работает в современном
 браузере без Node.js. Тесты проверяют API, конфигурацию, статические файлы,
 потерю связи, восстановление, подавление кратких сбоев и ошибки ответов API.
 SQLite-тесты работают с отдельными временными файлами: проверяют миграции,
 сохранение после перезапуска, связи, ограничения и откат транзакций.
 Рабочую БД тесты не используют.
 
-При наличии Node.js 20+ pytest дополнительно запускает настоящий HTTP-тест:
+При наличии Node.js pytest дополнительно запускает настоящий HTTP-тест:
 JavaScript-клиент панели → авторизация → SQLite → модель превью симулятора → выход.
 Он использует временные аккаунты/устройства и отдельный loopback-порт, останавливает
 тестовый сервер сам и не обращается к Debian или рабочему порту 8000.
 Без Node.js этот тест помечается skipped; остальные Python-тесты продолжают работать.
 
-Зависимости заданы допустимыми диапазонами. Полного lock-файла пока нет;
-результаты проверки конкретного окружения указаны в `docs/verification.md`.
+Зависимости заданы диапазонами и дополнительно зафиксированы с транзитивными
+зависимостями в `backend/requirements-runtime.lock` и `backend/requirements-dev.lock`.
+Результаты проверки конкретных окружений указаны в `docs/verification.md`.
 Сторонний firmware-код не скопирован. Лицензия всего проекта пока не выбрана.

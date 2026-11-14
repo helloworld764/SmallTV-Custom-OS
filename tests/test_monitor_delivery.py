@@ -42,10 +42,10 @@ def event(run_id=None, sequence=1, kind='START'):
             'kind': kind, 'occurred_at': 1000}
 
 
-@pytest.mark.parametrize('url', ['http://example.com:8000', 'http://localhost:8000', 'https://127.0.0.1:8000',
+@pytest.mark.parametrize('url', ['http://example.com:8000', 'http://localhost:8000', 'http://192.168.1.2:8000',
                                'http://127.0.0.1:8000/path', 'http://user:pw@127.0.0.1:8000',
                                'http://127.0.0.1', 'http://127.0.0.1:0', 'http://127.0.0.1:8000?key=value'])
-def test_only_explicit_loopback_origin_is_accepted(modules, url):
+def test_cleartext_origins_are_loopback_only(modules, url):
     with pytest.raises(ValueError):
         credential(modules, base_url=url)
 

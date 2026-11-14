@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import tempfile
 import pytest
+from browser_harness import capture
 
 ROOT=Path(__file__).resolve().parents[1]
 
@@ -56,7 +57,7 @@ document.querySelector('#report').textContent=JSON.stringify({count:samples.leng
         page=work/'weather.html'
         page.write_text('<!doctype html><meta charset="utf-8"><style>'+css+'body{padding:20px}main{max-width:none;display:grid;grid-template-columns:repeat(4,240px);gap:20px}</style><main></main><pre id="report"></pre><script>'+renderer+'\nconst DISPLAY='+json.dumps(display)+';\n'+script+'</script>',encoding='utf-8')
         screenshot=tmp_path/'weather-styles.png'
-        result=subprocess.run([chrome,'--headless=new','--no-first-run','--disable-background-networking','--disable-component-update','--disable-extensions','--disable-gpu','--hide-scrollbars','--window-size=1080,1120','--virtual-time-budget=1500','--user-data-dir='+str(work/'profile'),'--screenshot='+str(screenshot),'--dump-dom',page.as_uri()],capture_output=True,text=True,encoding='utf-8',errors='replace',timeout=90,**({'creationflags':subprocess.CREATE_NO_WINDOW} if os.name=='nt' else {}))
+        result=capture(chrome,work,page,screenshot,'#report',1080,1120)
         assert result.returncode==0
         match=re.search(r'<pre id="report">([^<]+)</pre>',result.stdout)
         assert match,'Weather browser report missing'

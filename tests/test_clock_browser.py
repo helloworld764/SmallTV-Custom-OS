@@ -11,6 +11,7 @@ import subprocess
 import tempfile
 
 import pytest
+from browser_harness import capture
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -114,13 +115,7 @@ body { padding:24px; } main { max-width:none; margin:0; }
 </style><main><h1>Storm OS · Clock scenes</h1><div class="qa-grid"></div><pre id="qa-report"></pre></main><script>'''
                     + script + '</script>', encoding='utf-8')
     screenshot = tmp_path / 'clock-scenes.png'
-    result = subprocess.run([chrome, '--headless=new', '--no-first-run', '--disable-background-networking',
-                             '--disable-component-update', '--disable-extensions', '--disable-gpu',
-                             '--hide-scrollbars', '--window-size=1220,1120', '--virtual-time-budget=1500',
-                             '--user-data-dir=' + str(work / 'chrome-profile'),
-                             '--screenshot=' + str(screenshot), '--dump-dom', page.as_uri()],
-                            capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=90,
-                            **({'creationflags': subprocess.CREATE_NO_WINDOW} if os.name == 'nt' else {}))
+    result = capture(chrome,work,page,screenshot,'#qa-report',1220,1120)
     assert result.returncode == 0, 'Isolated headless Chrome did not complete'
     match = re.search(r'<pre id="qa-report">([^<]+)</pre>', result.stdout)
     assert match, 'Browser did not produce a layout report'

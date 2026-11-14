@@ -1,0 +1,25 @@
+# TEMPLATE ONLY. Do not install until paths, user, HTTPS and data permissions are reviewed.
+[Unit]
+Description=Storm OS backend
+After=network.target
+
+[Service]
+Type=simple
+User=storm
+Group=storm
+WorkingDirectory=/opt/storm/current
+EnvironmentFile=/etc/storm/storm.env
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/opt/storm/current/.venv/bin/python -m backend.app
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/storm
+
+[Install]
+WantedBy=multi-user.target

@@ -50,9 +50,12 @@ def parse_forecast(data):
 
 @router.get('/forecast')
 def forecast(request: Request, principal: Annotated[Principal,Depends(current_user)]):
+    return forecast_for_owner(request,principal.user.id)
+
+def forecast_for_owner(request,owner_id):
     settings=request.app.state.settings; db=request.app.state.database; now=int(time.time())
     with db.connection() as c:
-        place=weather._preference(c,principal.user.id)
+        place=weather._preference(c,owner_id)
         key=weather._cache_key(place['latitude'],place['longitude'])+':'+place['timezone']
         row=c.execute('SELECT * FROM weather_forecast_cache WHERE cache_key=?',(key,)).fetchone()
     payload=json.loads(row['payload']) if row else None
