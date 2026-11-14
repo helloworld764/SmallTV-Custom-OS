@@ -5,6 +5,9 @@
 [device display API](docs/device-display-protocol.md),
 [компактные ресурсы](docs/device-assets.md), [Monitor по HTTPS](docs/monitor-server.md).
 Настоящая прошивка и аппаратная совместимость ещё не подтверждены.
+Исходный firmware-проект и MIT-лицензия проверены на фиксированном коммите:
+[аудит](docs/upstream-firmware-audit.md). До доставки подготовлены
+[схемы обмена](firmware/protocol/README.md) и [порядок первого подключения](docs/first-device-check.md).
 
 Пользовательский журнал устройства убран по указанию владельца.
 <!-- Архив реализации журнала: docs/device-journal.md. -->

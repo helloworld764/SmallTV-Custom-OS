@@ -1,0 +1,393 @@
+{
+  "$defs": {
+    "DisplayOptions": {
+      "additionalProperties": false,
+      "properties": {
+        "accent": {
+          "default": "#ff5264",
+          "pattern": "^#[0-9a-fA-F]{6}$",
+          "title": "Accent",
+          "type": "string"
+        },
+        "auto_rotate": {
+          "default": false,
+          "title": "Auto Rotate",
+          "type": "boolean"
+        },
+        "backdrop": {
+          "default": "solid",
+          "enum": [
+            "gradient",
+            "grid",
+            "solid",
+            "stars",
+            "wallpaper"
+          ],
+          "title": "Backdrop",
+          "type": "string"
+        },
+        "background": {
+          "default": "#080809",
+          "pattern": "^#[0-9a-fA-F]{6}$",
+          "title": "Background",
+          "type": "string"
+        },
+        "custom_colors": {
+          "default": false,
+          "title": "Custom Colors",
+          "type": "boolean"
+        },
+        "date_format": {
+          "default": "long",
+          "enum": [
+            "iso",
+            "long",
+            "short"
+          ],
+          "title": "Date Format",
+          "type": "string"
+        },
+        "day_progress": {
+          "default": true,
+          "title": "Day Progress",
+          "type": "boolean"
+        },
+        "night_brightness": {
+          "default": 20,
+          "maximum": 100,
+          "minimum": 0,
+          "title": "Night Brightness",
+          "type": "integer"
+        },
+        "night_enabled": {
+          "default": false,
+          "title": "Night Enabled",
+          "type": "boolean"
+        },
+        "night_end": {
+          "default": "08:00",
+          "pattern": "^(?:[01][0-9]|2[0-3]):[0-5][0-9]$",
+          "title": "Night End",
+          "type": "string"
+        },
+        "night_start": {
+          "default": "22:00",
+          "pattern": "^(?:[01][0-9]|2[0-3]):[0-5][0-9]$",
+          "title": "Night Start",
+          "type": "string"
+        },
+        "notification_seconds": {
+          "default": 4,
+          "maximum": 10,
+          "minimum": 2,
+          "title": "Notification Seconds",
+          "type": "integer"
+        },
+        "palettes": {
+          "items": {
+            "$ref": "#/$defs/Palette"
+          },
+          "maxItems": 8,
+          "title": "Palettes",
+          "type": "array"
+        },
+        "pet_motion": {
+          "default": "normal",
+          "enum": [
+            "normal",
+            "off",
+            "reduced"
+          ],
+          "title": "Pet Motion",
+          "type": "string"
+        },
+        "pet_phrases": {
+          "default": true,
+          "title": "Pet Phrases",
+          "type": "boolean"
+        },
+        "quiet_enabled": {
+          "default": false,
+          "title": "Quiet Enabled",
+          "type": "boolean"
+        },
+        "quiet_end": {
+          "default": "08:00",
+          "pattern": "^(?:[01][0-9]|2[0-3]):[0-5][0-9]$",
+          "title": "Quiet End",
+          "type": "string"
+        },
+        "quiet_start": {
+          "default": "23:00",
+          "pattern": "^(?:[01][0-9]|2[0-3]):[0-5][0-9]$",
+          "title": "Quiet Start",
+          "type": "string"
+        },
+        "rotate_seconds": {
+          "default": 30,
+          "maximum": 600,
+          "minimum": 10,
+          "title": "Rotate Seconds",
+          "type": "integer"
+        },
+        "screens": {
+          "items": {
+            "enum": [
+              "clock",
+              "codex",
+              "markets",
+              "tamagotchi",
+              "weather"
+            ],
+            "type": "string"
+          },
+          "maxItems": 5,
+          "minItems": 1,
+          "title": "Screens",
+          "type": "array"
+        },
+        "text": {
+          "default": "#f4f4f6",
+          "pattern": "^#[0-9a-fA-F]{6}$",
+          "title": "Text",
+          "type": "string"
+        },
+        "timezone": {
+          "default": "local",
+          "enum": [
+            "America/New_York",
+            "Asia/Dubai",
+            "Asia/Tokyo",
+            "Europe/Berlin",
+            "Europe/London",
+            "Europe/Moscow",
+            "UTC",
+            "local"
+          ],
+          "title": "Timezone",
+          "type": "string"
+        },
+        "wallpaper_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Wallpaper Id"
+        },
+        "weekday": {
+          "default": true,
+          "title": "Weekday",
+          "type": "boolean"
+        }
+      },
+      "title": "DisplayOptions",
+      "type": "object"
+    },
+    "DisplaySettings": {
+      "properties": {
+        "advanced": {
+          "$ref": "#/$defs/DisplayOptions"
+        },
+        "brightness": {
+          "maximum": 100,
+          "minimum": 0,
+          "title": "Brightness",
+          "type": "integer"
+        },
+        "clock_format": {
+          "enum": [
+            "12h",
+            "24h"
+          ],
+          "title": "Clock Format",
+          "type": "string"
+        },
+        "clock_layout": {
+          "enum": [
+            "analog",
+            "regular",
+            "stacked",
+            "tall"
+          ],
+          "title": "Clock Layout",
+          "type": "string"
+        },
+        "clock_seconds": {
+          "title": "Clock Seconds",
+          "type": "boolean"
+        },
+        "current_screen": {
+          "anyOf": [
+            {
+              "enum": [
+                "clock",
+                "codex",
+                "markets",
+                "monitor",
+                "null",
+                "tamagotchi",
+                "weather"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Current Screen"
+        },
+        "device_style": {
+          "enum": [
+            "classic",
+            "minimal",
+            "orbit",
+            "terminal"
+          ],
+          "title": "Device Style",
+          "type": "string"
+        },
+        "screen_changed_at": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Screen Changed At",
+          "type": "integer"
+        },
+        "start_screen": {
+          "enum": [
+            "clock",
+            "codex",
+            "markets",
+            "monitor",
+            "null",
+            "tamagotchi",
+            "weather"
+          ],
+          "title": "Start Screen",
+          "type": "string"
+        },
+        "theme": {
+          "enum": [
+            "BlackArch Red",
+            "Dark Blue",
+            "Light",
+            "Purple"
+          ],
+          "title": "Theme",
+          "type": "string"
+        }
+      },
+      "required": [
+        "brightness",
+        "theme",
+        "start_screen",
+        "clock_format",
+        "clock_seconds",
+        "device_style",
+        "clock_layout",
+        "current_screen",
+        "screen_changed_at",
+        "advanced"
+      ],
+      "title": "DisplaySettings",
+      "type": "object"
+    },
+    "Palette": {
+      "additionalProperties": false,
+      "properties": {
+        "accent": {
+          "default": "#ff5264",
+          "pattern": "^#[0-9a-fA-F]{6}$",
+          "title": "Accent",
+          "type": "string"
+        },
+        "background": {
+          "default": "#080809",
+          "pattern": "^#[0-9a-fA-F]{6}$",
+          "title": "Background",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 24,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "text": {
+          "default": "#f4f4f6",
+          "pattern": "^#[0-9a-fA-F]{6}$",
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "Palette",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "data": {
+      "additionalProperties": true,
+      "title": "Data",
+      "type": "object"
+    },
+    "device_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Device Id",
+      "type": "string"
+    },
+    "poll_after_seconds": {
+      "maximum": 5,
+      "minimum": 5,
+      "title": "Poll After Seconds",
+      "type": "integer"
+    },
+    "schema_version": {
+      "maximum": 1,
+      "minimum": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "screen": {
+      "enum": [
+        "clock",
+        "codex",
+        "markets",
+        "monitor",
+        "tamagotchi",
+        "weather"
+      ],
+      "title": "Screen",
+      "type": "string"
+    },
+    "server_time": {
+      "maximum": 9007199254740991,
+      "minimum": 0,
+      "title": "Server Time",
+      "type": "integer"
+    },
+    "settings": {
+      "$ref": "#/$defs/DisplaySettings"
+    }
+  },
+  "required": [
+    "schema_version",
+    "device_id",
+    "server_time",
+    "poll_after_seconds",
+    "screen",
+    "settings",
+    "data"
+  ],
+  "title": "DisplayEnvelope",
+  "type": "object"
+}

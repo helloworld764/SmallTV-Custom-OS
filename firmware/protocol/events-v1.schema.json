@@ -1,0 +1,87 @@
+{
+  "$defs": {
+    "CompletionEvent": {
+      "properties": {
+        "cursor": {
+          "maximum": 9007199254740991,
+          "minimum": 1,
+          "title": "Cursor",
+          "type": "integer"
+        },
+        "id": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "DONE",
+            "ERROR",
+            "INTERRUPTED"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "ttl_seconds": {
+          "maximum": 60,
+          "minimum": 1,
+          "title": "Ttl Seconds",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "cursor",
+        "kind",
+        "ttl_seconds"
+      ],
+      "title": "CompletionEvent",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "device_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Device Id",
+      "type": "string"
+    },
+    "events": {
+      "items": {
+        "$ref": "#/$defs/CompletionEvent"
+      },
+      "maxItems": 20,
+      "title": "Events",
+      "type": "array"
+    },
+    "next_cursor": {
+      "maximum": 9007199254740991,
+      "minimum": 0,
+      "title": "Next Cursor",
+      "type": "integer"
+    },
+    "schema_version": {
+      "maximum": 1,
+      "minimum": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "server_time": {
+      "maximum": 9007199254740991,
+      "minimum": 0,
+      "title": "Server Time",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "schema_version",
+    "device_id",
+    "server_time",
+    "next_cursor",
+    "events"
+  ],
+  "title": "EventsEnvelope",
+  "type": "object"
+}

@@ -1,0 +1,38 @@
+{
+  "checked_at": "2026-11-14",
+  "repository": "https://github.com/iodn/geekmagic-tv-esp8266",
+  "commit": "6113fb9c86e2e2024883253fd99a3d2550ffccb2",
+  "firmware_code_imported": false,
+  "files": {
+    "README.md": {
+      "url": "https://raw.githubusercontent.com/iodn/geekmagic-tv-esp8266/6113fb9c86e2e2024883253fd99a3d2550ffccb2/README.md",
+      "sha256": "56a66b901c241432555344b8fb3ed4da3dbf996e0a477db65ef9294754278042",
+      "bytes": 19901
+    },
+    "LICENSE": {
+      "url": "https://raw.githubusercontent.com/iodn/geekmagic-tv-esp8266/6113fb9c86e2e2024883253fd99a3d2550ffccb2/LICENSE",
+      "sha256": "9dc69e1559838e10f0c71379cdec752c608b1b75478e255fb83066efa167d60e",
+      "bytes": 1068
+    },
+    "platformio.ini": {
+      "url": "https://raw.githubusercontent.com/iodn/geekmagic-tv-esp8266/6113fb9c86e2e2024883253fd99a3d2550ffccb2/platformio.ini",
+      "sha256": "d7196bab2297db25d28d1aaf15f6e69eb9babd537ce864b4a341d497d6cab0e1",
+      "bytes": 976
+    },
+    "audit/hardware-baseline.txt": {
+      "url": "https://raw.githubusercontent.com/iodn/geekmagic-tv-esp8266/6113fb9c86e2e2024883253fd99a3d2550ffccb2/audit/hardware-baseline.txt",
+      "sha256": "ea2d31a15111a0054419b1ad19ac853f495485d3b5c4610d7891d42c6e5fc850",
+      "bytes": 2374
+    },
+    "audit/hardware-verification.txt": {
+      "url": "https://raw.githubusercontent.com/iodn/geekmagic-tv-esp8266/6113fb9c86e2e2024883253fd99a3d2550ffccb2/audit/hardware-verification.txt",
+      "sha256": "281e00c3a15d3f513a05b239e91a9435729f9e7a288bf4334b4b658ac936fe49",
+      "bytes": 10389
+    },
+    "audit/firmware-review.txt": {
+      "url": "https://raw.githubusercontent.com/iodn/geekmagic-tv-esp8266/6113fb9c86e2e2024883253fd99a3d2550ffccb2/audit/firmware-review.txt",
+      "sha256": "16f94908392df7131c2770b1e57049f7577e4f80bbb2e1f34bf92da903ca8fcd",
+      "bytes": 27473
+    }
+  }
+}
